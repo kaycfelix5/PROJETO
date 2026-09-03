@@ -1,9 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Autismo & Realidade | Monitoramento, Inclusão e Cuidado",
-  description: "Plataforma acessível de apoio e acompanhamento de pessoas no espectro autista (TEA) e neurodivergências, inspirada na difusão de conhecimento do Instituto Autismo e Realidade.",
-  keywords: ["autismo", "TEA", "autismo e realidade", "monitoramento", "rotina visual", "inclusão", "acompanhante", "portador", "cerca virtual"],
+  title: "Heart Tech | Monitoramento, Inclusão e Cuidado",
+  description: "Heart Tech - Plataforma acessível de apoio e acompanhamento de pessoas no espectro autista (TEA) e neurodivergências.",
+  keywords: ["Heart Tech", "autismo", "TEA", "monitoramento", "rotina visual", "inclusão", "acompanhante", "portador", "cerca virtual"],
 };
 
 export default function RootLayout({ children }) {

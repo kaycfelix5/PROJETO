@@ -6,15 +6,15 @@ import styles from "./page.module.css";
 export default function Home() {
   return (
     <div className={styles.pageWrapper}>
-      {/* TOP HEADER INSTITUCIONAL (ESTILO AUTISMO E REALIDADE) */}
+      {/* TOP HEADER INSTITUCIONAL */}
       <div className={styles.topBar}>
         <div className={styles.topBarContainer}>
           <div className={styles.topBarItem}>
-            <span>🧩</span>
-            <span>Apoio e Difusão do Conhecimento sobre o Transtorno do Espectro Autista (TEA)</span>
+            <span>❤️</span>
+            <span>Heart Tech • Apoio e Difusão do Conhecimento sobre o Transtorno do Espectro Autista (TEA)</span>
           </div>
           <div className={styles.topBarItem}>
-            <span>contato@autismoerealidade.org.br</span>
+            <span>contato@hearttech.com.br</span>
           </div>
         </div>
       </div>
@@ -30,7 +30,7 @@ export default function Home() {
               <div className={styles.puzzleSquare} style={{ background: "#e53935" }}></div>
             </div>
             <div className={styles.navBrandTitle}>
-              <span className={styles.brandMainText}>Autismo & Realidade</span>
+              <span className={styles.brandMainText}>Heart Tech</span>
               <span className={styles.brandSubText}>Acompanhamento & Cuidado</span>
             </div>
           </Link>
@@ -112,11 +112,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FOOTER ESTILO AUTISMO E REALIDADE */}
+      {/* FOOTER */}
       <footer className={styles.footer}>
         <div className={styles.footerContainer}>
           <div>
-            🧩 <strong>Autismo & Realidade</strong> • Difundindo conhecimento e apoiando famílias e cuidadores.
+            ❤️ <strong>Heart Tech</strong> • Tecnologia, acolhimento e difusão de conhecimento para famílias e cuidadores.
           </div>
           <ul className={styles.footerLinks}>
             <li>

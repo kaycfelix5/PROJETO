@@ -1079,8 +1079,8 @@ export default function LandingPage() {
       <nav className={styles.dashNavbar}>
         <div className={styles.dashNavContainer}>
           <Link href="/" className={styles.dashBrand}>
-            <span>🧩</span>
-            <span>NeuroCare</span>
+            <span>❤️</span>
+            <span>Heart Tech</span>
           </Link>
 
           <div className={styles.dashUserArea}>

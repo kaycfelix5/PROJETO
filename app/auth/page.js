@@ -150,8 +150,8 @@ export default function AuthPage() {
         <section className={styles.sideBanner}>
           <div className={styles.brandHeader}>
             <div className={styles.brandLogo}>
-              <span className={styles.logoIcon}>🧩</span>
-              <span>NeuroCare</span>
+              <span className={styles.logoIcon}>❤️</span>
+              <span>Heart Tech</span>
             </div>
             <h1 className={styles.bannerTitle}>
               Sua área personalizada por perfil

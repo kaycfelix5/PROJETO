@@ -1,4 +1,4 @@
-// Centralized State Engine & Web Audio Utilities for Autismo & Realidade Care
+// Centralized State Engine & Web Audio Utilities for Heart Tech Care
 
 // Default seed data
 const DEFAULT_USERS_DB = [
@@ -34,7 +34,7 @@ const DEFAULT_USERS_DB = [
     name: "Administrador Geral",
     birthDate: "1980-01-01",
     role: "administrador",
-    email: "admin@autismoerealidade.org.br",
+    email: "admin@hearttech.com.br",
     phone: "(11) 99999-0000",
     password: "admin",
   },
