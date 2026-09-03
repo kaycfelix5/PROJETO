@@ -148,6 +148,657 @@ function BreathingExercise({ onClose }) {
 }
 
 /* ================================================================ */
+/* COMPONENTE PAINEL DO ADMINISTRADOR                               */
+/* ================================================================ */
+function AdminPanel({ addToast, portadoresGlobais = [], savePortadores }) {
+  const [adminTab, setAdminTab] = useState("overview");
+  const [usersList, setUsersList] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    name: "",
+    email: "",
+    role: "acompanhante",
+    phone: "",
+    password: "",
+    birthDate: ""
+  });
+
+  const [showAddPortadorModal, setShowAddPortadorModal] = useState(false);
+  const [newPortadorData, setNewPortadorData] = useState({
+    nome: "",
+    idade: "",
+    condicao: "",
+    local: "Casa",
+    geofenceMax: 150
+  });
+
+  const [broadcastMsg, setBroadcastMsg] = useState("");
+  const [broadcastType, setBroadcastType] = useState("info");
+
+  const [logs, setLogs] = useState([
+    { id: 1, time: "14:02:15", type: "AUTH", user: "Admin", action: "Sessão administrativa iniciada com sucesso", level: "info" },
+    { id: 2, time: "13:45:10", type: "GPS", user: "Lucas Silveira", action: "Atualização de telemetria GPS - Raio 120m (Seguro)", level: "success" },
+    { id: 3, time: "12:30:22", type: "ROTINA", user: "Sofia Mendes", action: "Meta diária 'Uso de Abafador' atualizada para 90%", level: "info" },
+    { id: 4, time: "11:15:04", type: "SYNC", user: "Patrícia Mendes", action: "Sincronização de rotinas com dispositivo IoT", level: "info" },
+    { id: 5, time: "09:00:18", type: "SISTEMA", user: "Sistema", action: "Backup diário das bases de dados concluído (0 falhas)", level: "success" },
+  ]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("nc_users");
+      if (raw) {
+        setUsersList(JSON.parse(raw));
+      } else {
+        const seed = [
+          { name: "Patrícia Mendes", birthDate: "1988-04-12", role: "acompanhante", email: "patricia@email.com", phone: "(11) 98765-4321", password: "123" },
+          { name: "Lucas Silveira",  birthDate: "2015-05-10", role: "portador",     email: "lucas@email.com",   phone: "(11) 97777-1111", password: "123" },
+          { name: "Sofia Mendes",    birthDate: "2012-08-20", role: "portador",     email: "sofia@email.com",   phone: "(11) 96666-2222", password: "123" },
+          { name: "Admin",           birthDate: "1980-01-01", role: "administrador",email: "admin@email.com",   phone: "(11) 00000-0000", password: "admin" },
+        ];
+        setUsersList(seed);
+        localStorage.setItem("nc_users", JSON.stringify(seed));
+      }
+    } catch {
+      // fallback
+    }
+  }, []);
+
+  const saveUsers = (updated) => {
+    setUsersList(updated);
+    try {
+      localStorage.setItem("nc_users", JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleCreateUser = (e) => {
+    e.preventDefault();
+    if (!newUserData.name.trim() || !newUserData.password.trim()) {
+      addToast("⚠️", "Campos obrigatórios", "Preencha nome e senha.", "#f59e0b");
+      return;
+    }
+    const updated = [...usersList, { ...newUserData, id: Date.now() }];
+    saveUsers(updated);
+    setNewUserData({ name: "", email: "", role: "acompanhante", phone: "", password: "", birthDate: "" });
+    setShowAddUserModal(false);
+    addToast("✅", "Usuário cadastrado!", `${newUserData.name} adicionado com sucesso.`, "#16a34a");
+    setLogs((prev) => [
+      { id: Date.now(), time: new Date().toLocaleTimeString(), type: "USER_CREATE", user: "Admin", action: `Usuário '${newUserData.name}' cadastrado (${newUserData.role})`, level: "success" },
+      ...prev
+    ]);
+  };
+
+  const handleDeleteUser = (userToDelete) => {
+    if (userToDelete.name.toLowerCase() === "admin") {
+      addToast("❌", "Ação não permitida", "Não é possível excluir o Administrador principal.", "#ef4444");
+      return;
+    }
+    const updated = usersList.filter((u) => u.name !== userToDelete.name);
+    saveUsers(updated);
+    addToast("🗑️", "Usuário removido", `${userToDelete.name} foi removido do sistema.`, "#e11d48");
+    setLogs((prev) => [
+      { id: Date.now(), time: new Date().toLocaleTimeString(), type: "USER_DELETE", user: "Admin", action: `Usuário '${userToDelete.name}' excluído`, level: "warning" },
+      ...prev
+    ]);
+  };
+
+  const handleCreatePortador = (e) => {
+    e.preventDefault();
+    if (!newPortadorData.nome.trim()) {
+      addToast("⚠️", "Nome obrigatório", "Preencha o nome do assistido.", "#f59e0b");
+      return;
+    }
+    const novo = {
+      id: Date.now(),
+      nome: newPortadorData.nome,
+      idade: newPortadorData.idade || "N/I",
+      condicao: newPortadorData.condicao || "TEA",
+      humor: "Calmo",
+      humorEmoji: "😌",
+      local: newPortadorData.local || "Casa",
+      distanciaMetros: 50,
+      pinX: 50,
+      pinY: 50,
+      geofenceMax: Number(newPortadorData.geofenceMax) || 150,
+      bateria: 100,
+      rotinas: [],
+      metas: [],
+      mensagens: []
+    };
+    const updated = [...(portadoresGlobais || []), novo];
+    savePortadores(updated);
+    setNewPortadorData({ nome: "", idade: "", condicao: "", local: "Casa", geofenceMax: 150 });
+    setShowAddPortadorModal(false);
+    addToast("✨", "Portador registrado!", `${novo.nome} adicionado ao ecossistema.`, "#16a34a");
+    setLogs((prev) => [
+      { id: Date.now(), time: new Date().toLocaleTimeString(), type: "PORTADOR_ADD", user: "Admin", action: `Portador '${novo.nome}' registrado no ecossistema`, level: "success" },
+      ...prev
+    ]);
+  };
+
+  const handleSendBroadcast = (e) => {
+    e.preventDefault();
+    if (!broadcastMsg.trim()) return;
+    addToast("📢", "Comunicado Transmitido!", broadcastMsg, broadcastType === "alert" ? "#ef4444" : "#0066c0");
+    setLogs((prev) => [
+      { id: Date.now(), time: new Date().toLocaleTimeString(), type: "BROADCAST", user: "Admin", action: `Alerta global emitido: "${broadcastMsg}"`, level: "warning" },
+      ...prev
+    ]);
+    setBroadcastMsg("");
+  };
+
+  const filteredUsers = usersList.filter((u) => {
+    const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === "all" || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
+  const countAcomp = usersList.filter((u) => u.role === "acompanhante").length;
+  const countPortadores = usersList.filter((u) => u.role === "portador").length;
+  const countAdmins = usersList.filter((u) => u.role === "administrador").length;
+
+  return (
+    <div style={{ animation: "fadeIn 0.3s ease" }}>
+      {/* HEADER DO PAINEL */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 14 }}>
+        <div>
+          <h2 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#004c97", marginBottom: 4 }}>
+            🛡️ Painel de Controle Administrativo
+          </h2>
+          <p style={{ color: "#64748b", fontSize: "0.95rem" }}>
+            Supervisão geral, governança de usuários, telemetria GPS e gestão de portadores.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setShowAddUserModal(true)}
+            className="btn-primary"
+            style={{ padding: "10px 18px", fontSize: "0.88rem" }}
+          >
+            ➕ Novo Usuário
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAddPortadorModal(true)}
+            className="btn-secondary"
+            style={{ padding: "10px 18px", fontSize: "0.88rem" }}
+          >
+            🧩 Novo Portador
+          </button>
+        </div>
+      </div>
+
+      {/* STATS CARDS */}
+      <div className={styles.adminStatsGrid}>
+        <div className={styles.adminStatCard}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+            <span style={{ fontSize: "1.8rem" }}>👥</span>
+            <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "4px 8px", borderRadius: 9999, fontSize: "0.75rem", fontWeight: 800 }}>Total</span>
+          </div>
+          <div className={styles.adminStatVal}>{usersList.length}</div>
+          <div className={styles.adminStatLbl}>Usuários Cadastrados</div>
+          <div style={{ marginTop: 8, fontSize: "0.78rem", color: "#64748b" }}>
+            {countAcomp} Acompanhantes • {countPortadores} Portadores • {countAdmins} Admin
+          </div>
+        </div>
+
+        <div className={styles.adminStatCard}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+            <span style={{ fontSize: "1.8rem" }}>💙</span>
+            <span style={{ background: "#dcfce7", color: "#15803d", padding: "4px 8px", borderRadius: 9999, fontSize: "0.75rem", fontWeight: 800 }}>Ativos</span>
+          </div>
+          <div className={styles.adminStatVal} style={{ color: "#16a34a" }}>{portadoresGlobais.length}</div>
+          <div className={styles.adminStatLbl}>Portadores em Acompanhamento</div>
+          <div style={{ marginTop: 8, fontSize: "0.78rem", color: "#64748b" }}>
+            100% com dados e rotinas mapeadas
+          </div>
+        </div>
+
+        <div className={styles.adminStatCard}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+            <span style={{ fontSize: "1.8rem" }}>🛰️</span>
+            <span style={{ background: "#fef3c7", color: "#b45309", padding: "4px 8px", borderRadius: 9999, fontSize: "0.75rem", fontWeight: 800 }}>Operacional</span>
+          </div>
+          <div className={styles.adminStatVal} style={{ color: "#f39200" }}>99.9%</div>
+          <div className={styles.adminStatLbl}>Uptime Telemetria & GPS</div>
+          <div style={{ marginTop: 8, fontSize: "0.78rem", color: "#64748b" }}>
+            Serviço de geolocalização e alertas online
+          </div>
+        </div>
+      </div>
+
+      {/* SUB-ABAS DO PAINEL */}
+      <div style={{ display: "flex", gap: 10, borderBottom: "2px solid #e2e8f0", paddingBottom: 12, marginBottom: 24, overflowX: "auto" }}>
+        {[
+          { id: "overview", label: "📊 Visão Geral", count: null },
+          { id: "users", label: "👥 Gestão de Usuários", count: usersList.length },
+          { id: "portadores", label: "🧩 Assistidos / Portadores", count: portadoresGlobais.length },
+          { id: "logs", label: "📋 Logs de Auditoria", count: logs.length },
+          { id: "broadcast", label: "📢 Transmissão de Alertas", count: null },
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setAdminTab(t.id)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 9999,
+              border: "none",
+              background: adminTab === t.id ? "#0066c0" : "#f1f5f9",
+              color: adminTab === t.id ? "#ffffff" : "#475569",
+              fontWeight: 700,
+              fontSize: "0.88rem",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              whiteSpace: "nowrap"
+            }}
+          >
+            <span>{t.label}</span>
+            {t.count !== null && (
+              <span style={{
+                background: adminTab === t.id ? "rgba(255,255,255,0.25)" : "#cbd5e1",
+                padding: "2px 7px",
+                borderRadius: 9999,
+                fontSize: "0.72rem"
+              }}>
+                {t.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* VIEW: OVERVIEW */}
+      {adminTab === "overview" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, border: "1px solid #e2e8f0" }}>
+            <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#004c97", marginBottom: 14 }}>
+              📡 Status da Infraestrutura
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f8fafc", borderRadius: 8 }}>
+                <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Banco de Dados Local (IndexedDB/LS)</span>
+                <span style={{ color: "#16a34a", fontWeight: 700, fontSize: "0.82rem" }}>● Ativo</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f8fafc", borderRadius: 8 }}>
+                <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Serviço de Geofencing & Cercas Virtuais</span>
+                <span style={{ color: "#16a34a", fontWeight: 700, fontSize: "0.82rem" }}>● Ativo</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f8fafc", borderRadius: 8 }}>
+                <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Módulo de Áudio Sensorial (Web Audio API)</span>
+                <span style={{ color: "#16a34a", fontWeight: 700, fontSize: "0.82rem" }}>● Ativo</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f8fafc", borderRadius: 8 }}>
+                <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Linha Direta de Emergência (190 / 192 / 193)</span>
+                <span style={{ color: "#16a34a", fontWeight: 700, fontSize: "0.82rem" }}>● Pronto</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: "white", padding: 24, borderRadius: 16, border: "1px solid #e2e8f0" }}>
+            <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#004c97", marginBottom: 14 }}>
+              ⚡ Ações Rápidas de Manutenção
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  addToast("🔄", "Sincronização executada", "Todos os nós de dados foram sincronizados.", "#16a34a");
+                }}
+                className="btn-secondary"
+                style={{ justifyContent: "flex-start", padding: "12px 16px" }}
+              >
+                🔄 Forçar Sincronização Geral de Dados
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm("Deseja restaurar as bases padrão do sistema?")) {
+                    localStorage.removeItem("nc_users");
+                    localStorage.removeItem("nc_portadores");
+                    localStorage.removeItem("nc_disponiveis");
+                    addToast("🧹", "Dados Restaurados", "Recarregando página com as sementes padrão...", "#0066c0");
+                    setTimeout(() => window.location.reload(), 1000);
+                  }
+                }}
+                className="btn-secondary"
+                style={{ justifyContent: "flex-start", padding: "12px 16px", color: "#dc2626", borderColor: "#fecdd3" }}
+              >
+                🧹 Restaurar Configurações Originais (Reset)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW: USUÁRIOS */}
+      {adminTab === "users" && (
+        <div>
+          <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap", justifyContent: "space-between" }}>
+            <input
+              type="text"
+              placeholder="🔍 Buscar por nome ou e-mail..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                flex: "1 1 260px",
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1.5px solid #cbd5e1",
+                fontSize: "0.9rem"
+              }}
+            />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 10,
+                border: "1.5px solid #cbd5e1",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                background: "white"
+              }}
+            >
+              <option value="all">Todos os Papéis ({usersList.length})</option>
+              <option value="acompanhante">Acompanhantes ({countAcomp})</option>
+              <option value="portador">Portadores ({countPortadores})</option>
+              <option value="administrador">Administradores ({countAdmins})</option>
+            </select>
+          </div>
+
+          <div className={styles.tableContainer}>
+            <table className={styles.userTable}>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Papel</th>
+                  <th>E-mail</th>
+                  <th>Telefone</th>
+                  <th style={{ textAlign: "right" }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((u, i) => (
+                    <tr key={i}>
+                      <td>
+                        <strong>{u.name}</strong>
+                        {u.birthDate && <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Nasc: {u.birthDate}</div>}
+                      </td>
+                      <td>
+                        <span className={
+                          u.role === "administrador"
+                            ? styles.badgeAdmin
+                            : u.role === "acompanhante"
+                            ? styles.badgeAcompanhante
+                            : styles.badgePortador
+                        } style={{ textTransform: "capitalize", fontSize: "0.78rem" }}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td>{u.email || "—"}</td>
+                      <td>{u.phone || "—"}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(u)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "#ef4444",
+                            cursor: "pointer",
+                            fontSize: "1.1rem",
+                            padding: "4px 8px"
+                          }}
+                          title="Remover Usuário"
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", padding: 30, color: "#64748b" }}>
+                      Nenhum usuário encontrado com os filtros aplicados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW: PORTADORES */}
+      {adminTab === "portadores" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 }}>
+          {portadoresGlobais.map((p) => (
+            <div key={p.id} style={{ background: "white", padding: 20, borderRadius: 16, border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: "1.8rem" }}>{p.humorEmoji || "🙂"}</span>
+                  <div>
+                    <strong style={{ fontSize: "1.05rem", color: "#004c97" }}>{p.nome}</strong>
+                    <div style={{ fontSize: "0.78rem", color: "#64748b" }}>{p.idade} • {p.condicao}</div>
+                  </div>
+                </div>
+                <span style={{ background: "#dcfce7", color: "#166534", padding: "3px 8px", borderRadius: 9999, fontSize: "0.72rem", fontWeight: 700 }}>
+                  🔋 {p.bateria}%
+                </span>
+              </div>
+              <div style={{ fontSize: "0.82rem", color: "#475569", background: "#f8fafc", padding: "10px 12px", borderRadius: 8 }}>
+                <div>📍 <strong>Local Atual:</strong> {p.local || "Não informado"}</div>
+                <div>🛡️ <strong>Cerca Geofence:</strong> até {p.geofenceMax || 150}m</div>
+                <div>📋 <strong>Rotinas Ativas:</strong> {p.rotinas?.length || 0} cadastradas</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* VIEW: LOGS DE AUDITORIA */}
+      {adminTab === "logs" && (
+        <div style={{ background: "white", padding: 24, borderRadius: 16, border: "1px solid #e2e8f0" }}>
+          <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#004c97", marginBottom: 16 }}>
+            📋 Registros de Auditoria e Telemetria em Tempo Real
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {logs.map((l) => (
+              <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, borderLeft: `4px solid ${l.level === "success" ? "#16a34a" : l.level === "warning" ? "#f59e0b" : "#0066c0"}` }}>
+                <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: "#64748b", minWidth: 65 }}>{l.time}</span>
+                <span style={{ background: "#e2e8f0", padding: "2px 6px", borderRadius: 4, fontSize: "0.72rem", fontWeight: 800 }}>{l.type}</span>
+                <span style={{ fontSize: "0.85rem", color: "#1e293b", flex: 1 }}>{l.action}</span>
+                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{l.user}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* VIEW: BROADCAST */}
+      {adminTab === "broadcast" && (
+        <div style={{ background: "white", padding: 28, borderRadius: 16, border: "1px solid #e2e8f0", maxWidth: 640 }}>
+          <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#004c97", marginBottom: 6 }}>
+            📢 Transmissão de Comunicado Global
+          </h3>
+          <p style={{ color: "#64748b", fontSize: "0.88rem", marginBottom: 20 }}>
+            Envie uma notificação instantânea para a tela de todos os acompanhantes e portadores ativos na plataforma.
+          </p>
+          <form onSubmit={handleSendBroadcast} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                Tipo de Alerta
+              </label>
+              <select
+                value={broadcastType}
+                onChange={(e) => setBroadcastType(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+              >
+                <option value="info">ℹ️ Informativo / Comunicado Padrão</option>
+                <option value="alert">⚠️ Alerta Geral / Manutenção</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                Mensagem
+              </label>
+              <textarea
+                rows={4}
+                value={broadcastMsg}
+                onChange={(e) => setBroadcastMsg(e.target.value)}
+                placeholder="Digite a mensagem a ser transmitida..."
+                style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px solid #cbd5e1", fontSize: "0.9rem", resize: "vertical" }}
+                required
+              />
+            </div>
+            <button type="submit" className="btn-primary" style={{ padding: "12px", fontSize: "0.95rem" }}>
+              🚀 Transmitir para Todos os Usuários
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: NOVO USUÁRIO */}
+      {showAddUserModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowAddUserModal(false)}>
+          <div className={styles.modalCard} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className={styles.modalHeader}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#004c97" }}>➕ Cadastrar Novo Usuário</h3>
+              <button className={styles.closeModalBtn} onClick={() => setShowAddUserModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleCreateUser} style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>Nome Completo *</label>
+                <input
+                  type="text"
+                  required
+                  value={newUserData.name}
+                  onChange={(e) => setNewUserData({ ...newUserData, name: e.target.value })}
+                  style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>Papel no Sistema</label>
+                <select
+                  value={newUserData.role}
+                  onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
+                  style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                >
+                  <option value="acompanhante">Acompanhante / Cuidador</option>
+                  <option value="portador">Portador / Assistido</option>
+                  <option value="administrador">Administrador</option>
+                </select>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>E-mail</label>
+                  <input
+                    type="email"
+                    value={newUserData.email}
+                    onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                    style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>Telefone</label>
+                  <input
+                    type="text"
+                    value={newUserData.phone}
+                    onChange={(e) => setNewUserData({ ...newUserData, phone: e.target.value })}
+                    style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>Senha de Acesso *</label>
+                <input
+                  type="password"
+                  required
+                  value={newUserData.password}
+                  onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                  style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+                <button type="button" onClick={() => setShowAddUserModal(false)} className="btn-secondary">Cancelar</button>
+                <button type="submit" className="btn-primary">Salvar Usuário</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: NOVO PORTADOR */}
+      {showAddPortadorModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowAddPortadorModal(false)}>
+          <div className={styles.modalCard} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className={styles.modalHeader}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#004c97" }}>🧩 Registrar Portador no Sistema</h3>
+              <button className={styles.closeModalBtn} onClick={() => setShowAddPortadorModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleCreatePortador} style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>Nome do Assistido *</label>
+                <input
+                  type="text"
+                  required
+                  value={newPortadorData.nome}
+                  onChange={(e) => setNewPortadorData({ ...newPortadorData, nome: e.target.value })}
+                  style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>Idade</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 8 anos"
+                    value={newPortadorData.idade}
+                    onChange={(e) => setNewPortadorData({ ...newPortadorData, idade: e.target.value })}
+                    style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>Cerca Geofence (m)</label>
+                  <input
+                    type="number"
+                    value={newPortadorData.geofenceMax}
+                    onChange={(e) => setNewPortadorData({ ...newPortadorData, geofenceMax: e.target.value })}
+                    style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#334155", marginBottom: 4 }}>Condição / Necessidade Específica</label>
+                <input
+                  type="text"
+                  placeholder="Ex: TEA Nível 1 • Hipersensibilidade Auditiva"
+                  value={newPortadorData.condicao}
+                  onChange={(e) => setNewPortadorData({ ...newPortadorData, condicao: e.target.value })}
+                  style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: "0.9rem" }}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+                <button type="button" onClick={() => setShowAddPortadorModal(false)} className="btn-secondary">Cancelar</button>
+                <button type="submit" className="btn-primary">Registrar Portador</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================ */
 /* PÁGINA PRINCIPAL                                                 */
 /* ================================================================ */
 export default function LandingPage() {
