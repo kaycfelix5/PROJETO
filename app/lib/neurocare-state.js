@@ -1,124 +1,11 @@
 // Centralized State Engine & Web Audio Utilities for Heart Tech Care
 
-// Default seed data
-const DEFAULT_USERS_DB = [
-  {
-    name: "Patrícia Mendes",
-    birthDate: "1988-04-12",
-    role: "acompanhante",
-    email: "patricia.mendes@email.com",
-    phone: "(11) 98765-4321",
-    password: "123",
-  },
-  {
-    name: "Lucas Silveira",
-    birthDate: "2015-05-10",
-    role: "portador",
-    email: "lucas.silveira@email.com",
-    phone: "(11) 97777-1111",
-    password: "123",
-    caregiverName: "Patrícia Mendes",
-    caregiverPhone: "(11) 98765-4321",
-  },
-  {
-    name: "Sofia Mendes",
-    birthDate: "2012-08-20",
-    role: "portador",
-    email: "sofia.mendes@email.com",
-    phone: "(11) 96666-2222",
-    password: "123",
-    caregiverName: "Patrícia Mendes",
-    caregiverPhone: "(11) 98765-4321",
-  },
-  {
-    name: "Administrador Geral",
-    birthDate: "1980-01-01",
-    role: "administrador",
-    email: "admin@hearttech.com.br",
-    phone: "(11) 99999-0000",
-    password: "admin",
-  },
-];
+// Seed inicial vazia (sem dados falsos/de exemplo)
+const FAKE_NAMES = ["Patrícia Mendes", "Lucas Silveira", "Sofia Mendes", "Admin", "Administrador Geral", "Gabriel Ramos", "Beatriz Lima"];
 
-const DEFAULT_PORTADORES = [
-  {
-    id: 101,
-    nome: "Lucas Silveira",
-    idade: "9 anos",
-    condicao: "TEA Nível 1 • TDAH",
-    status: "Estável / Regulação Ótima",
-    bateria: 88,
-    humor: "Calmo e Focado",
-    humorEmoji: "😌",
-    local: "Escola Municipal / Sala AEE",
-    distanciaMetros: 120,
-    pinX: 60,
-    pinY: 38,
-    geofenceMax: 150,
-    rotinas: [
-      { id: 1, hora: "08:00", titulo: "🥪 Café da manhã com apoio visual", concluida: true },
-      { id: 2, hora: "10:00", titulo: "📚 Aula / Atividade pedagógica no AEE", concluida: true },
-      { id: 3, hora: "14:00", titulo: "🗣️ Sessão de Fonoaudiologia", concluida: false },
-      { id: 4, hora: "16:30", titulo: "🎧 Pausa Sensorial com fones e lanche", concluida: false },
-      { id: 5, hora: "19:00", titulo: "🌙 Desaceleração e Higiene do Sono", concluida: false },
-    ],
-    metas: [
-      { id: 1, titulo: "💧 Ingestão de Água (Meta: 1.5L)", progresso: 75 },
-      { id: 2, titulo: "🧘 Momentos de Autorregulação Concluídos", progresso: 100 },
-      { id: 3, titulo: "📚 Tarefas Escolares sem Crise de Frustração", progresso: 60 },
-    ],
-    historicoLogs: [
-      { id: 1, hora: "Hoje às 08:30", tipo: "Rotina Matinal", detalhes: "Acordou bem-disposto e tomou café sem resistência sensorial.", status: "Excelente" },
-      { id: 2, hora: "Ontem às 15:40", tipo: "Pausa Sensorial", detalhes: "Solicitou fones abafadores após ruído na sala. Autorregulação em 10 min.", status: "Sucesso" },
-    ],
-    mensagensRecentes: [],
-  },
-  {
-    id: 102,
-    nome: "Sofia Mendes",
-    idade: "12 anos",
-    condicao: "TEA Nível 2 • Sensibilidade Sonora",
-    status: "Em Pausa Sensorial",
-    bateria: 94,
-    humor: "Usando Fones Abafadores",
-    humorEmoji: "🎧",
-    local: "Casa / Quarto de Conforto",
-    distanciaMetros: 45,
-    pinX: 45,
-    pinY: 55,
-    geofenceMax: 100,
-    rotinas: [
-      { id: 1, hora: "09:00", titulo: "🎨 Pintura e estimulação motora fina", concluida: true },
-      { id: 2, hora: "11:30", titulo: "🥗 Almoço balanceado", concluida: true },
-      { id: 3, hora: "15:00", titulo: "🧩 Quebra-cabeças e raciocínio lógico", concluida: false },
-    ],
-    metas: [
-      { id: 1, titulo: "🎧 Uso de Abafador em Ambientes Externos", progresso: 90 },
-      { id: 2, titulo: "🥦 Aceitação de 2 Novas Texturas Alimentares", progresso: 50 },
-    ],
-    historicoLogs: [
-      { id: 1, hora: "Hoje às 09:15", tipo: "Terapia Ocupacional", detalhes: "Concluiu pintura em aquarela com foco elevado.", status: "Ótimo" },
-    ],
-    mensagensRecentes: [],
-  },
-];
-
-const DEFAULT_DISPONIVEIS = [
-  {
-    id: 103,
-    nome: "Gabriel Ramos",
-    idade: "7 anos",
-    condicao: "TEA Nível 1 • Hiperfoco em Robótica",
-    cidade: "São Paulo, SP",
-  },
-  {
-    id: 104,
-    nome: "Beatriz Lima",
-    idade: "15 anos",
-    condicao: "Neurodivergente • TDAH e Dislexia",
-    cidade: "Campinas, SP",
-  },
-];
+const DEFAULT_USERS_DB = [];
+const DEFAULT_PORTADORES = [];
+const DEFAULT_DISPONIVEIS = [];
 
 // Helper to broadcast state changes across components
 export const broadcastSync = () => {
@@ -129,30 +16,34 @@ export const broadcastSync = () => {
 
 // Storage Getters and Setters
 export const getStoredUsers = () => {
-  if (typeof window === "undefined") return DEFAULT_USERS_DB;
+  if (typeof window === "undefined") return [];
   const saved = localStorage.getItem("hearttech_users_db");
-  if (!saved) {
-    localStorage.setItem("hearttech_users_db", JSON.stringify(DEFAULT_USERS_DB));
-    return DEFAULT_USERS_DB;
-  }
+  if (!saved) return [];
   try {
-    return JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    const cleaned = Array.isArray(parsed) ? parsed.filter(u => !FAKE_NAMES.includes(u.name)) : [];
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem("hearttech_users_db", JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
-    return DEFAULT_USERS_DB;
+    return [];
   }
 };
 
 export const getStoredPortadores = () => {
-  if (typeof window === "undefined") return DEFAULT_PORTADORES;
+  if (typeof window === "undefined") return [];
   const saved = localStorage.getItem("hearttech_portadores_db");
-  if (!saved) {
-    localStorage.setItem("hearttech_portadores_db", JSON.stringify(DEFAULT_PORTADORES));
-    return DEFAULT_PORTADORES;
-  }
+  if (!saved) return [];
   try {
-    return JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    const cleaned = Array.isArray(parsed) ? parsed.filter(p => !FAKE_NAMES.includes(p.nome)) : [];
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem("hearttech_portadores_db", JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
-    return DEFAULT_PORTADORES;
+    return [];
   }
 };
 
@@ -164,16 +55,18 @@ export const saveStoredPortadores = (portadores) => {
 };
 
 export const getStoredDisponiveis = () => {
-  if (typeof window === "undefined") return DEFAULT_DISPONIVEIS;
+  if (typeof window === "undefined") return [];
   const saved = localStorage.getItem("hearttech_disponiveis_db");
-  if (!saved) {
-    localStorage.setItem("hearttech_disponiveis_db", JSON.stringify(DEFAULT_DISPONIVEIS));
-    return DEFAULT_DISPONIVEIS;
-  }
+  if (!saved) return [];
   try {
-    return JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    const cleaned = Array.isArray(parsed) ? parsed.filter(p => !FAKE_NAMES.includes(p.nome)) : [];
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem("hearttech_disponiveis_db", JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
-    return DEFAULT_DISPONIVEIS;
+    return [];
   }
 };
 

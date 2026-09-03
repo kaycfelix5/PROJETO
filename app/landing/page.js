@@ -8,59 +8,29 @@ import styles from "../dashboard/dashboard.module.css";
 /* ================================================================ */
 /* HELPERS DE PERSISTÊNCIA (localStorage)                           */
 /* ================================================================ */
+const FAKE_NAMES = ["Lucas Silveira", "Sofia Mendes", "Gabriel Ramos", "Beatriz Lima", "Patrícia Mendes", "Admin", "Administrador Geral"];
+
 const LS = {
   get: (k, fallback) => {
-    try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+    try {
+      const v = localStorage.getItem(k);
+      if (!v) return fallback;
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter((item) => !FAKE_NAMES.includes(item.nome) && !FAKE_NAMES.includes(item.name));
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(k, JSON.stringify(cleaned));
+        }
+        return cleaned;
+      }
+      return parsed;
+    } catch { return fallback; }
   },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
-const PORTADORES_SEED = [
-  {
-    id: 101, nome: "Lucas Silveira", idade: "9 anos",
-    condicao: "TEA Nível 1 • TDAH",
-    humor: "Calmo", humorEmoji: "😌",
-    local: "Escola Municipal / Sala AEE",
-    distanciaMetros: 120, pinX: 60, pinY: 38,
-    geofenceMax: 150, bateria: 88,
-    rotinas: [
-      { id: 1, hora: "08:00", titulo: "🥪 Café da manhã com apoio visual", concluida: true },
-      { id: 2, hora: "10:00", titulo: "📚 Atividade pedagógica no AEE",    concluida: true },
-      { id: 3, hora: "14:00", titulo: "🗣️ Sessão de Fonoaudiologia",        concluida: false },
-      { id: 4, hora: "16:30", titulo: "🎧 Pausa Sensorial com fones",       concluida: false },
-      { id: 5, hora: "19:00", titulo: "🌙 Higiene do Sono",                 concluida: false },
-    ],
-    metas: [
-      { id: 1, titulo: "💧 Ingestão de Água (1.5L)", progresso: 75 },
-      { id: 2, titulo: "🧘 Momentos de Autorregulação", progresso: 100 },
-      { id: 3, titulo: "📚 Tarefas sem Crise de Frustração", progresso: 60 },
-    ],
-    mensagens: [],
-  },
-  {
-    id: 102, nome: "Sofia Mendes", idade: "12 anos",
-    condicao: "TEA Nível 2 • Sensibilidade Sonora",
-    humor: "Pausa Sensorial", humorEmoji: "🎧",
-    local: "Casa / Quarto de Conforto",
-    distanciaMetros: 45, pinX: 45, pinY: 55,
-    geofenceMax: 100, bateria: 94,
-    rotinas: [
-      { id: 1, hora: "09:00", titulo: "🎨 Pintura e Estimulação Motora", concluida: true },
-      { id: 2, hora: "11:30", titulo: "🥗 Almoço Balanceado",            concluida: true },
-      { id: 3, hora: "15:00", titulo: "🧩 Quebra-cabeças / Raciocínio",  concluida: false },
-    ],
-    metas: [
-      { id: 1, titulo: "🎧 Abafador em Ambientes Externos", progresso: 90 },
-      { id: 2, titulo: "🥦 2 Novas Texturas Alimentares",   progresso: 50 },
-    ],
-    mensagens: [],
-  },
-];
-
-const DISPONIVEIS_SEED = [
-  { id: 103, nome: "Gabriel Ramos",  idade: "7 anos",  condicao: "TEA Nível 1 • Hiperfoco em Robótica", cidade: "São Paulo, SP" },
-  { id: 104, nome: "Beatriz Lima",   idade: "15 anos", condicao: "TDAH e Dislexia",                      cidade: "Campinas, SP"  },
-];
+const PORTADORES_SEED = [];
+const DISPONIVEIS_SEED = [];
 
 /* ================================================================ */
 /* COMPONENTE TOAST                                                 */
@@ -178,32 +148,59 @@ function AdminPanel({ addToast, portadoresGlobais = [], savePortadores }) {
   const [broadcastMsg, setBroadcastMsg] = useState("");
   const [broadcastType, setBroadcastType] = useState("info");
 
-  const [logs, setLogs] = useState([
-    { id: 1, time: "14:02:15", type: "AUTH", user: "Admin", action: "Sessão administrativa iniciada com sucesso", level: "info" },
-    { id: 2, time: "13:45:10", type: "GPS", user: "Lucas Silveira", action: "Atualização de telemetria GPS - Raio 120m (Seguro)", level: "success" },
-    { id: 3, time: "12:30:22", type: "ROTINA", user: "Sofia Mendes", action: "Meta diária 'Uso de Abafador' atualizada para 90%", level: "info" },
-    { id: 4, time: "11:15:04", type: "SYNC", user: "Patrícia Mendes", action: "Sincronização de rotinas com dispositivo IoT", level: "info" },
-    { id: 5, time: "09:00:18", type: "SISTEMA", user: "Sistema", action: "Backup diário das bases de dados concluído (0 falhas)", level: "success" },
-  ]);
+  const [logs, setLogs] = useState([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("nc_users");
-      if (raw) {
-        setUsersList(JSON.parse(raw));
-      } else {
-        const seed = [
-          { name: "Patrícia Mendes", birthDate: "1988-04-12", role: "acompanhante", email: "patricia@email.com", phone: "(11) 98765-4321", password: "123" },
-          { name: "Lucas Silveira",  birthDate: "2015-05-10", role: "portador",     email: "lucas@email.com",   phone: "(11) 97777-1111", password: "123" },
-          { name: "Sofia Mendes",    birthDate: "2012-08-20", role: "portador",     email: "sofia@email.com",   phone: "(11) 96666-2222", password: "123" },
-          { name: "Admin",           birthDate: "1980-01-01", role: "administrador",email: "admin@email.com",   phone: "(11) 00000-0000", password: "admin" },
-        ];
-        setUsersList(seed);
-        localStorage.setItem("nc_users", JSON.stringify(seed));
+    // Carrega usuários e logs do banco de dados do servidor
+    const fetchServerData = async () => {
+      try {
+        const res = await fetch("/api/db");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.users)) {
+            setUsersList(data.users);
+            localStorage.setItem("nc_users", JSON.stringify(data.users));
+          }
+          if (Array.isArray(data.logs) && data.logs.length > 0) {
+            setLogs(data.logs);
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn("Erro ao sincronizar com banco de dados:", err);
       }
-    } catch {
-      // fallback
-    }
+
+      // Fallback local
+      try {
+        const raw = localStorage.getItem("nc_users");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const cleaned = parsed.filter((u) => !FAKE_NAMES.includes(u.name));
+          if (!cleaned.some((u) => u.role === "administrador")) {
+            cleaned.unshift({
+              id: 1,
+              name: "Administrador",
+              email: "admin@hearttech.com.br",
+              role: "administrador",
+              phone: "(11) 99999-0000"
+            });
+          }
+          setUsersList(cleaned);
+        } else {
+          setUsersList([{
+            id: 1,
+            name: "Administrador",
+            email: "admin@hearttech.com.br",
+            role: "administrador",
+            phone: "(11) 99999-0000"
+          }]);
+        }
+      } catch {
+        setUsersList([]);
+      }
+    };
+
+    fetchServerData();
   }, []);
 
   const saveUsers = (updated) => {
@@ -213,31 +210,65 @@ function AdminPanel({ addToast, portadoresGlobais = [], savePortadores }) {
     } catch {}
   };
 
-  const handleCreateUser = (e) => {
+  const handleCreateUser = async (e) => {
     e.preventDefault();
     if (!newUserData.name.trim() || !newUserData.password.trim()) {
       addToast("⚠️", "Campos obrigatórios", "Preencha nome e senha.", "#f59e0b");
       return;
     }
-    const updated = [...usersList, { ...newUserData, id: Date.now() }];
-    saveUsers(updated);
-    setNewUserData({ name: "", email: "", role: "acompanhante", phone: "", password: "", birthDate: "" });
-    setShowAddUserModal(false);
-    addToast("✅", "Usuário cadastrado!", `${newUserData.name} adicionado com sucesso.`, "#16a34a");
-    setLogs((prev) => [
-      { id: Date.now(), time: new Date().toLocaleTimeString(), type: "USER_CREATE", user: "Admin", action: `Usuário '${newUserData.name}' cadastrado (${newUserData.role})`, level: "success" },
-      ...prev
-    ]);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newUserData)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast("❌", "Erro no cadastro", data.error || "Não foi possível criar o usuário.", "#ef4444");
+        return;
+      }
+      const createdUser = data.user || { ...newUserData, id: Date.now() };
+      const updated = [...usersList, createdUser];
+      saveUsers(updated);
+      setNewUserData({ name: "", email: "", role: "acompanhante", phone: "", password: "", birthDate: "" });
+      setShowAddUserModal(false);
+      addToast("✅", "Usuário cadastrado!", `${createdUser.name} adicionado ao banco de dados.`, "#16a34a");
+      setLogs((prev) => [
+        { id: Date.now(), time: new Date().toLocaleTimeString(), type: "USER_CREATE", user: "Admin", action: `Usuário '${createdUser.name}' cadastrado (${createdUser.role})`, level: "success" },
+        ...prev
+      ]);
+    } catch (err) {
+      // Fallback local
+      const fallbackUser = { ...newUserData, id: Date.now() };
+      const updated = [...usersList, fallbackUser];
+      saveUsers(updated);
+      setNewUserData({ name: "", email: "", role: "acompanhante", phone: "", password: "", birthDate: "" });
+      setShowAddUserModal(false);
+      addToast("✅", "Usuário cadastrado!", `${fallbackUser.name} adicionado localmente.`, "#16a34a");
+    }
   };
 
-  const handleDeleteUser = (userToDelete) => {
-    if (userToDelete.name.toLowerCase() === "admin") {
+  const handleDeleteUser = async (userToDelete) => {
+    if (userToDelete.role === "administrador" || userToDelete.name.toLowerCase() === "administrador" || userToDelete.name.toLowerCase() === "admin") {
       addToast("❌", "Ação não permitida", "Não é possível excluir o Administrador principal.", "#ef4444");
       return;
     }
-    const updated = usersList.filter((u) => u.name !== userToDelete.name);
+    if (!confirm(`Tem certeza que deseja remover o usuário "${userToDelete.name}"?`)) return;
+
+    try {
+      await fetch("/api/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: userToDelete.name, id: userToDelete.id })
+      });
+    } catch (err) {
+      console.warn("Erro ao excluir na API:", err);
+    }
+
+    const updated = usersList.filter((u) => u.name !== userToDelete.name && u.id !== userToDelete.id);
     saveUsers(updated);
-    addToast("🗑️", "Usuário removido", `${userToDelete.name} foi removido do sistema.`, "#e11d48");
+    addToast("🗑️", "Usuário removido", `${userToDelete.name} foi removido do banco de dados.`, "#e11d48");
     setLogs((prev) => [
       { id: Date.now(), time: new Date().toLocaleTimeString(), type: "USER_DELETE", user: "Admin", action: `Usuário '${userToDelete.name}' excluído`, level: "warning" },
       ...prev
@@ -580,27 +611,35 @@ function AdminPanel({ addToast, portadoresGlobais = [], savePortadores }) {
       {/* VIEW: PORTADORES */}
       {adminTab === "portadores" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 }}>
-          {portadoresGlobais.map((p) => (
-            <div key={p.id} style={{ background: "white", padding: 20, borderRadius: 16, border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: "1.8rem" }}>{p.humorEmoji || "🙂"}</span>
-                  <div>
-                    <strong style={{ fontSize: "1.05rem", color: "#004c97" }}>{p.nome}</strong>
-                    <div style={{ fontSize: "0.78rem", color: "#64748b" }}>{p.idade} • {p.condicao}</div>
+          {portadoresGlobais.length > 0 ? (
+            portadoresGlobais.map((p) => (
+              <div key={p.id} style={{ background: "white", padding: 20, borderRadius: 16, border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: "1.8rem" }}>{p.humorEmoji || "🙂"}</span>
+                    <div>
+                      <strong style={{ fontSize: "1.05rem", color: "#004c97" }}>{p.nome}</strong>
+                      <div style={{ fontSize: "0.78rem", color: "#64748b" }}>{p.idade} • {p.condicao}</div>
+                    </div>
                   </div>
+                  <span style={{ background: "#dcfce7", color: "#166534", padding: "3px 8px", borderRadius: 9999, fontSize: "0.72rem", fontWeight: 700 }}>
+                    🔋 {p.bateria}%
+                  </span>
                 </div>
-                <span style={{ background: "#dcfce7", color: "#166534", padding: "3px 8px", borderRadius: 9999, fontSize: "0.72rem", fontWeight: 700 }}>
-                  🔋 {p.bateria}%
-                </span>
+                <div style={{ fontSize: "0.82rem", color: "#475569", background: "#f8fafc", padding: "10px 12px", borderRadius: 8 }}>
+                  <div>📍 <strong>Local Atual:</strong> {p.local || "Não informado"}</div>
+                  <div>🛡️ <strong>Cerca Geofence:</strong> até {p.geofenceMax || 150}m</div>
+                  <div>📋 <strong>Rotinas Ativas:</strong> {p.rotinas?.length || 0} cadastradas</div>
+                </div>
               </div>
-              <div style={{ fontSize: "0.82rem", color: "#475569", background: "#f8fafc", padding: "10px 12px", borderRadius: 8 }}>
-                <div>📍 <strong>Local Atual:</strong> {p.local || "Não informado"}</div>
-                <div>🛡️ <strong>Cerca Geofence:</strong> até {p.geofenceMax || 150}m</div>
-                <div>📋 <strong>Rotinas Ativas:</strong> {p.rotinas?.length || 0} cadastradas</div>
-              </div>
+            ))
+          ) : (
+            <div style={{ background: "white", padding: 36, borderRadius: 16, border: "1.5px dashed #cbd5e1", textAlign: "center", gridColumn: "1 / -1", color: "#64748b" }}>
+              <div style={{ fontSize: "2rem", marginBottom: 8 }}>🧩</div>
+              <p style={{ fontWeight: 600 }}>Nenhum portador registrado no momento.</p>
+              <p style={{ fontSize: "0.82rem", marginTop: 4 }}>Clique em "🧩 Novo Portador" acima para cadastrar um assistido no sistema.</p>
             </div>
-          ))}
+          )}
         </div>
       )}
 
@@ -611,14 +650,20 @@ function AdminPanel({ addToast, portadoresGlobais = [], savePortadores }) {
             📋 Registros de Auditoria e Telemetria em Tempo Real
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {logs.map((l) => (
-              <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, borderLeft: `4px solid ${l.level === "success" ? "#16a34a" : l.level === "warning" ? "#f59e0b" : "#0066c0"}` }}>
-                <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: "#64748b", minWidth: 65 }}>{l.time}</span>
-                <span style={{ background: "#e2e8f0", padding: "2px 6px", borderRadius: 4, fontSize: "0.72rem", fontWeight: 800 }}>{l.type}</span>
-                <span style={{ fontSize: "0.85rem", color: "#1e293b", flex: 1 }}>{l.action}</span>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{l.user}</span>
+            {logs.length > 0 ? (
+              logs.map((l) => (
+                <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, borderLeft: `4px solid ${l.level === "success" ? "#16a34a" : l.level === "warning" ? "#f59e0b" : "#0066c0"}` }}>
+                  <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: "#64748b", minWidth: 65 }}>{l.time}</span>
+                  <span style={{ background: "#e2e8f0", padding: "2px 6px", borderRadius: 4, fontSize: "0.72rem", fontWeight: 800 }}>{l.type}</span>
+                  <span style={{ fontSize: "0.85rem", color: "#1e293b", flex: 1 }}>{l.action}</span>
+                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{l.user}</span>
+                </div>
+              ))
+            ) : (
+              <div style={{ textAlign: "center", padding: "30px 10px", color: "#64748b", fontSize: "0.9rem" }}>
+                Nenhum evento registrado ainda nesta sessão.
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
@@ -852,6 +897,12 @@ export default function LandingPage() {
 
     try {
       const u = JSON.parse(raw);
+      if (FAKE_NAMES.includes(u.name)) {
+        localStorage.removeItem("nc_auth");
+        localStorage.removeItem("nc_user");
+        router.replace("/auth");
+        return;
+      }
       setUser(u);
 
       // Carrega portadores persistidos
@@ -864,14 +915,49 @@ export default function LandingPage() {
 
       // Se é portador, carrega dados dela
       if (u.role === "portador") {
-        const myP = savedP.find((p) => p.nome === u.name) || savedP[0];
-        if (myP) {
-          setMinhaRotina(myP.rotinas || []);
-          setMinhasMetas(myP.metas || []);
-          setDistMax(myP.geofenceMax || 150);
-          setSimDist(myP.distanciaMetros || 80);
+        let myP = savedP.find((p) => p.nome === u.name);
+        if (!myP) {
+          myP = {
+            id: Date.now(),
+            nome: u.name,
+            idade: u.birthDate ? `${new Date().getFullYear() - new Date(u.birthDate).getFullYear()} anos` : "N/I",
+            condicao: "Acompanhamento Ativo",
+            humor: "Calmo",
+            humorEmoji: "😌",
+            local: "Não informado",
+            distanciaMetros: 0,
+            pinX: 50,
+            pinY: 50,
+            geofenceMax: 150,
+            bateria: 100,
+            rotinas: [],
+            metas: [],
+            mensagens: []
+          };
+          const updated = [...savedP, myP];
+          setPortadores(updated);
+          LS.set("nc_portadores", updated);
         }
+        setMinhaRotina(myP.rotinas || []);
+        setMinhasMetas(myP.metas || []);
+        setDistMax(myP.geofenceMax || 150);
+        setSimDist(myP.distanciaMetros || 0);
       }
+
+      // Sincroniza com o banco de dados do servidor
+      fetch("/api/db")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d && Array.isArray(d.portadores) && d.portadores.length > 0) {
+            setPortadores(d.portadores);
+            LS.set("nc_portadores", d.portadores);
+          }
+          if (d && Array.isArray(d.disponiveis)) {
+            setDisponiveis(d.disponiveis);
+            LS.set("nc_disponiveis", d.disponiveis);
+          }
+        })
+        .catch(() => {});
     } catch { router.replace("/auth"); }
     setLoading(false);
   }, [router]);
@@ -879,15 +965,34 @@ export default function LandingPage() {
   const selectedPortador = portadores.find((p) => p.id === selectedPortadorId) || portadores[0] || null;
 
   /* ================================================================ */
-  /* PERSISTÊNCIA - salva portadores ao mudar                         */
+  /* PERSISTÊNCIA - salva no localStorage e no banco de dados da API  */
   /* ================================================================ */
-  const savePortadores = (newList) => {
+  const savePortadores = async (newList) => {
     setPortadores(newList);
     LS.set("nc_portadores", newList);
+    try {
+      await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ portadores: newList })
+      });
+    } catch (e) {
+      console.warn("Fallback offline na persistência:", e);
+    }
   };
-  const saveDisponiveis = (newList) => {
+
+  const saveDisponiveis = async (newList) => {
     setDisponiveis(newList);
     LS.set("nc_disponiveis", newList);
+    try {
+      await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disponiveis: newList })
+      });
+    } catch (e) {
+      console.warn("Fallback offline na persistência:", e);
+    }
   };
 
   /* ================================================================ */
@@ -1069,7 +1174,7 @@ export default function LandingPage() {
 
   if (!user) return null;
 
-  const meuPortadorData = portadores.find((p) => p.nome === user.name) || portadores[0];
+  const meuPortadorData = portadores.find((p) => p.nome === user.name) || portadores[0] || null;
 
   return (
     <div className={styles.dashboardWrapper}>

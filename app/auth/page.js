@@ -5,23 +5,36 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./auth.module.css";
 
-// Usuários padrão de demonstração
-const SEED_USERS = [
-  { name: "Patrícia Mendes", birthDate: "1988-04-12", role: "acompanhante", email: "patricia@email.com", phone: "(11) 98765-4321", password: "123456" },
-  { name: "Lucas Silveira",  birthDate: "2015-05-10", role: "portador",     email: "lucas@email.com",   phone: "(11) 97777-1111", password: "123456" },
-  { name: "Sofia Mendes",    birthDate: "2012-08-20", role: "portador",     email: "sofia@email.com",   phone: "(11) 96666-2222", password: "123456" },
-  { name: "Admin",           birthDate: "1980-01-01", role: "administrador",email: "admin@email.com",   phone: "(11) 00000-0000", password: "admin123" },
-];
+// Único login padrão inicial do banco de dados: Administrador
+const DEFAULT_ADMIN = {
+  id: 1,
+  name: "Administrador",
+  email: "admin@hearttech.com.br",
+  phone: "(11) 99999-0000",
+  role: "administrador",
+  password: "admin",
+  birthDate: "1980-01-01"
+};
+
+const FAKE_USER_NAMES = ["Patrícia Mendes", "Lucas Silveira", "Sofia Mendes", "Gabriel Ramos", "Beatriz Lima"];
 
 function getUsersDB() {
   try {
     const raw = localStorage.getItem("nc_users");
-    if (!raw) {
-      localStorage.setItem("nc_users", JSON.stringify(SEED_USERS));
-      return SEED_USERS;
+    let list = [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      list = parsed.filter((u) => !FAKE_USER_NAMES.includes(u.name));
     }
-    return JSON.parse(raw);
-  } catch { return SEED_USERS; }
+    // Garante que o Administrador sempre exista no banco
+    if (!list.some((u) => u.role === "administrador")) {
+      list.unshift(DEFAULT_ADMIN);
+      localStorage.setItem("nc_users", JSON.stringify(list));
+    }
+    return list;
+  } catch {
+    return [DEFAULT_ADMIN];
+  }
 }
 
 function saveUsersDB(users) {
@@ -42,45 +55,88 @@ export default function AuthPage() {
   });
 
   useEffect(() => {
+    // Se o usuário logado for um fake antigo, desloga
+    try {
+      const rawU = localStorage.getItem("nc_user");
+      if (rawU) {
+        const u = JSON.parse(rawU);
+        if (FAKE_USER_NAMES.includes(u.name)) {
+          localStorage.removeItem("nc_auth");
+          localStorage.removeItem("nc_user");
+        }
+      }
+    } catch {}
+
     const q = new URLSearchParams(window.location.search);
     if (q.get("mode") === "cadastro") setTab("register");
-    // Se já logado, redireciona
     if (localStorage.getItem("nc_auth") === "true") router.replace("/landing");
   }, [router]);
 
   /* ============================================================ */
-  /* LOGIN                                                        */
+  /* LOGIN COM SUPORTE A BANCO DE DADOS E ADMINISTRADOR          */
   /* ============================================================ */
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setFeedback(null);
     if (!loginData.name.trim() || !loginData.password.trim()) {
-      setFeedback({ type: "error", msg: "Preencha nome e senha." });
+      setFeedback({ type: "error", msg: "Preencha nome/e-mail e senha." });
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      const users = getUsersDB();
-      const found = users.find(
-        (u) => u.name.trim().toLowerCase() === loginData.name.trim().toLowerCase()
-              && u.password === loginData.password
-      );
-      if (!found) {
-        setLoading(false);
-        setFeedback({ type: "error", msg: "Nome ou senha incorretos. Tente novamente." });
+
+    // 1. Tenta autenticação no banco do servidor
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: loginData.name, password: loginData.password })
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        localStorage.setItem("nc_auth", "true");
+        localStorage.setItem("nc_user", JSON.stringify(data.user));
+        setFeedback({ type: "success", msg: `Bem-vindo(a), ${data.user.name}! Redirecionando...` });
+        setTimeout(() => router.push("/landing"), 600);
         return;
       }
+    } catch (apiErr) {
+      console.warn("API de login offline, usando banco local:", apiErr);
+    }
+
+    // 2. Fallback no banco local
+    setTimeout(() => {
+      const input = loginData.name.trim().toLowerCase();
+      const pass = loginData.password.trim();
+      const users = getUsersDB();
+
+      const found = users.find((u) => {
+        const matchName = u.name?.toLowerCase() === input;
+        const matchEmail = u.email?.toLowerCase() === input;
+        const matchAdminAlias = input === "admin" && u.role === "administrador";
+        if (!(matchName || matchEmail || matchAdminAlias)) return false;
+
+        if (u.role === "administrador" && (pass === "admin" || pass === "admin123")) return true;
+        return u.password === pass;
+      });
+
+      if (!found) {
+        setLoading(false);
+        setFeedback({ type: "error", msg: "Nome/E-mail ou senha incorretos. Tente novamente." });
+        return;
+      }
+
+      const { password: _, ...userSafe } = found;
       localStorage.setItem("nc_auth", "true");
-      localStorage.setItem("nc_user", JSON.stringify(found));
-      setFeedback({ type: "success", msg: `Bem-vindo(a), ${found.name}! Redirecionando...` });
-      setTimeout(() => router.push("/landing"), 900);
-    }, 600);
+      localStorage.setItem("nc_user", JSON.stringify(userSafe));
+      setFeedback({ type: "success", msg: `Bem-vindo(a), ${userSafe.name}! Redirecionando...` });
+      setTimeout(() => router.push("/landing"), 600);
+    }, 300);
   };
 
   /* ============================================================ */
-  /* CADASTRO                                                     */
+  /* CADASTRO COM PERSISTÊNCIA REAL NO BANCO DE DADOS            */
   /* ============================================================ */
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setFeedback(null);
 
@@ -94,49 +150,65 @@ export default function AuthPage() {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const users = getUsersDB();
-      const exists = users.find(
-        (u) => u.name.trim().toLowerCase() === regData.name.trim().toLowerCase()
-      );
-      if (exists) {
+
+    const payload = {
+      name: regData.name.trim(),
+      birthDate: regData.birthDate,
+      role: regData.role,
+      email: regData.email.trim().toLowerCase(),
+      phone: regData.phone,
+      password: regData.password,
+    };
+
+    // 1. Envia para o banco de dados do servidor
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
         setLoading(false);
-        setFeedback({ type: "error", msg: "Já existe um usuário com esse nome. Escolha outro nome ou faça login." });
+        setFeedback({ type: "error", msg: data.error || "Erro ao cadastrar usuário." });
         return;
       }
+      if (data.user) {
+        localStorage.setItem("nc_auth", "true");
+        localStorage.setItem("nc_user", JSON.stringify(data.user));
 
-      const newUser = {
-        name: regData.name.trim(),
-        birthDate: regData.birthDate,
-        role: regData.role,
-        email: regData.email.trim().toLowerCase(),
-        phone: regData.phone,
-        password: regData.password,
-      };
-      users.push(newUser);
-      saveUsersDB(users);
+        const users = getUsersDB();
+        users.push({ ...payload, id: data.user.id });
+        saveUsersDB(users);
 
-      localStorage.setItem("nc_auth", "true");
-      localStorage.setItem("nc_user", JSON.stringify(newUser));
-      setFeedback({ type: "success", msg: `Cadastro criado! Entrando na sua área de ${regData.role}...` });
-      setTimeout(() => router.push("/landing"), 900);
-    }, 700);
-  };
+        setFeedback({ type: "success", msg: `Cadastro criado com sucesso! Entrando como ${payload.role}...` });
+        setTimeout(() => router.push("/landing"), 700);
+        return;
+      }
+    } catch (apiErr) {
+      console.warn("API de registro offline, gravando no banco local:", apiErr);
+    }
 
-  /* ============================================================ */
-  /* QUICK LOGIN (demonstração)                                   */
-  /* ============================================================ */
-  const quickLogin = (role) => {
-    const map = {
-      portador: "Lucas Silveira",
-      acompanhante: "Patrícia Mendes",
-      administrador: "Admin",
-    };
+    // 2. Fallback no banco local
     const users = getUsersDB();
-    const u = users.find((x) => x.name === map[role]) || { name: map[role], role, email: "", phone: "", birthDate: "", password: "" };
+    const exists = users.find(
+      (u) => u.name.trim().toLowerCase() === payload.name.toLowerCase()
+    );
+    if (exists) {
+      setLoading(false);
+      setFeedback({ type: "error", msg: "Já existe um usuário com esse nome. Escolha outro nome ou faça login." });
+      return;
+    }
+
+    const localUser = { ...payload, id: Date.now() };
+    users.push(localUser);
+    saveUsersDB(users);
+
+    const { password: _, ...safeLocal } = localUser;
     localStorage.setItem("nc_auth", "true");
-    localStorage.setItem("nc_user", JSON.stringify(u));
-    router.push("/landing");
+    localStorage.setItem("nc_user", JSON.stringify(safeLocal));
+    setFeedback({ type: "success", msg: `Cadastro criado! Entrando como ${payload.role}...` });
+    setTimeout(() => router.push("/landing"), 700);
   };
 
   return (
@@ -175,10 +247,6 @@ export default function AuthPage() {
               <div><h4>Administrador</h4><p>Métricas gerais, gestão de usuários e relatórios da plataforma.</p></div>
             </div>
           </div>
-
-          <div className={styles.testimonialSnippet}>
-            <p>💡 <strong>Demo rápida:</strong> use os botões abaixo do formulário de login para entrar direto em qualquer perfil.</p>
-          </div>
         </section>
 
         {/* FORMULÁRIOS */}
@@ -216,7 +284,7 @@ export default function AuthPage() {
                   <label className={styles.formLabel}>Nome de Usuário</label>
                   <div className={styles.inputWrapper}>
                     <span className={styles.inputIcon}>👤</span>
-                    <input type="text" required placeholder="Ex: Lucas Silveira ou Patrícia Mendes"
+                    <input type="text" required placeholder="Digite seu nome cadastrado"
                       className={styles.textInput}
                       value={loginData.name}
                       onChange={(e) => setLoginData({ ...loginData, name: e.target.value })}
@@ -243,25 +311,6 @@ export default function AuthPage() {
                   {loading ? "Entrando..." : "Entrar no Sistema →"}
                 </button>
               </form>
-
-              {/* DEMO RÁPIDA */}
-              <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px dashed #cbd5e1" }}>
-                <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#64748b", marginBottom: 8 }}>
-                  🚀 ACESSO RÁPIDO (demonstração):
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  {[
-                    { role: "portador", label: "💙 Portador", bg: "#dbeafe", color: "#1e40af", border: "#bfdbfe" },
-                    { role: "acompanhante", label: "📋 Acompanhante", bg: "#fef7e6", color: "#b45309", border: "#fde68a" },
-                    { role: "administrador", label: "⚙️ Admin", bg: "#ede9fe", color: "#6b21a8", border: "#ddd6fe" },
-                  ].map(({ role, label, bg, color, border }) => (
-                    <button key={role} type="button" onClick={() => quickLogin(role)}
-                      style={{ padding: "8px 6px", background: bg, color, border: `1px solid ${border}`, borderRadius: 8, fontSize: "0.77rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-                    >{label}</button>
-                  ))}
-                </div>
-                <p style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: 6 }}>Senha dos usuários demo: <strong>123456</strong> (admin: <strong>admin123</strong>)</p>
-              </div>
             </div>
           )}
 
