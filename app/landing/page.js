@@ -26,7 +26,7 @@ const LS = {
       return parsed;
     } catch { return fallback; }
   },
-  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } },
 };
 
 const PORTADORES_SEED = [];
@@ -57,7 +57,7 @@ function Toast({ toasts, dismiss }) {
 /* ================================================================ */
 function BreathingExercise({ onClose }) {
   const [phase, setPhase] = useState("inhale"); // inhale | hold | exhale
-  const [sec, setSec]     = useState(4);
+  const [sec, setSec] = useState(4);
   const [cycles, setCycles] = useState(0);
 
   useEffect(() => {
@@ -67,7 +67,7 @@ function BreathingExercise({ onClose }) {
         if (s <= 1) {
           setPhase((p) => {
             if (p === "inhale") { setSec(4); return "hold"; }
-            if (p === "hold")   { setSec(6); return "exhale"; }
+            if (p === "hold") { setSec(6); return "exhale"; }
             setCycles((c) => c + 1);
             setSec(4); return "inhale";
           });
@@ -207,7 +207,7 @@ function AdminPanel({ addToast, portadoresGlobais = [], savePortadores }) {
     setUsersList(updated);
     try {
       localStorage.setItem("nc_users", JSON.stringify(updated));
-    } catch {}
+    } catch { }
   };
 
   const handleCreateUser = async (e) => {
@@ -568,8 +568,8 @@ function AdminPanel({ addToast, portadoresGlobais = [], savePortadores }) {
                           u.role === "administrador"
                             ? styles.badgeAdmin
                             : u.role === "acompanhante"
-                            ? styles.badgeAcompanhante
-                            : styles.badgePortador
+                              ? styles.badgeAcompanhante
+                              : styles.badgePortador
                         } style={{ textTransform: "capitalize", fontSize: "0.78rem" }}>
                           {u.role}
                         </span>
@@ -847,33 +847,33 @@ function AdminPanel({ addToast, portadoresGlobais = [], savePortadores }) {
 /* PÁGINA PRINCIPAL                                                 */
 /* ================================================================ */
 export default function LandingPage() {
-  const router  = useRouter();
-  const [user, setUser]         = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [toasts, setToasts]     = useState([]);
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [toasts, setToasts] = useState([]);
 
   /* ----- ACOMPANHANTE ----- */
   const [acompTab, setAcompTab] = useState("portadores");
-  const [portadores, setPortadores]         = useState([]);
-  const [disponiveis, setDisponiveis]       = useState([]);
+  const [portadores, setPortadores] = useState([]);
+  const [disponiveis, setDisponiveis] = useState([]);
   const [selectedPortadorId, setSelectedPortadorId] = useState(null);
-  const [showAttachModal, setShowAttachModal]         = useState(false);
-  const [showUnbindModal, setShowUnbindModal]         = useState(false);
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [showUnbindModal, setShowUnbindModal] = useState(false);
   const [portadorParaDesvincular, setPortadorParaDesvincular] = useState(null);
   const [novaHora, setNovaHora] = useState("12:00");
   const [novaTarefa, setNovaTarefa] = useState("");
-  const [distMax, setDistMax]   = useState(150);
-  const [simDist, setSimDist]   = useState(120);
+  const [distMax, setDistMax] = useState(150);
+  const [simDist, setSimDist] = useState(120);
   const [emergencyAuth, setEmergencyAuth] = useState(null);
   const [emergencyModal, setEmergencyModal] = useState(false);
 
   /* ----- PORTADOR ----- */
   const [portadorTab, setPortadorTab] = useState("rotinas");
-  const [minhaRotina, setMinhaRotina]   = useState([]);
-  const [minhasMetas, setMinhasMetas]   = useState([]);
-  const [meuHumor, setMeuHumor]         = useState(null);
+  const [minhaRotina, setMinhaRotina] = useState([]);
+  const [minhasMetas, setMinhasMetas] = useState([]);
+  const [meuHumor, setMeuHumor] = useState(null);
   const [humoresFeedback, setHumoresFeedback] = useState("");
-  const [pauseModal, setPauseModal]     = useState(false);
+  const [pauseModal, setPauseModal] = useState(false);
   const [callCareModal, setCallCareModal] = useState(false);
   const [mensagemEnviada, setMensagemEnviada] = useState(null);
 
@@ -892,74 +892,128 @@ export default function LandingPage() {
   /* ================================================================ */
   useEffect(() => {
     const auth = localStorage.getItem("nc_auth");
-    const raw  = localStorage.getItem("nc_user");
-    if (auth !== "true" || !raw) { router.replace("/auth"); return; }
+    const raw = localStorage.getItem("nc_user");
 
-    try {
-      const u = JSON.parse(raw);
-      if (FAKE_NAMES.includes(u.name)) {
-        localStorage.removeItem("nc_auth");
-        localStorage.removeItem("nc_user");
-        router.replace("/auth");
-        return;
-      }
-      setUser(u);
+    if (auth !== "true" || !raw) {
+      router.replace("/auth");
+      return;
+    }
 
-      // Carrega portadores persistidos
-      const savedP = LS.get("nc_portadores", PORTADORES_SEED);
-      setPortadores(savedP);
-      if (savedP.length > 0) setSelectedPortadorId(savedP[0].id);
+    async function carregarDados() {
+      try {
+        const u = JSON.parse(raw);
 
-      const savedD = LS.get("nc_disponiveis", DISPONIVEIS_SEED);
-      setDisponiveis(savedD);
-
-      // Se é portador, carrega dados dela
-      if (u.role === "portador") {
-        let myP = savedP.find((p) => p.nome === u.name);
-        if (!myP) {
-          myP = {
-            id: Date.now(),
-            nome: u.name,
-            idade: u.birthDate ? `${new Date().getFullYear() - new Date(u.birthDate).getFullYear()} anos` : "N/I",
-            condicao: "Acompanhamento Ativo",
-            humor: "Calmo",
-            humorEmoji: "😌",
-            local: "Não informado",
-            distanciaMetros: 0,
-            pinX: 50,
-            pinY: 50,
-            geofenceMax: 150,
-            bateria: 100,
-            rotinas: [],
-            metas: [],
-            mensagens: []
-          };
-          const updated = [...savedP, myP];
-          setPortadores(updated);
-          LS.set("nc_portadores", updated);
+        if (FAKE_NAMES.includes(u.name)) {
+          localStorage.removeItem("nc_auth");
+          localStorage.removeItem("nc_user");
+          router.replace("/auth");
+          return;
         }
-        setMinhaRotina(myP.rotinas || []);
-        setMinhasMetas(myP.metas || []);
-        setDistMax(myP.geofenceMax || 150);
-        setSimDist(myP.distanciaMetros || 0);
-      }
 
-      // Sincroniza com o banco de dados do servidor
-      fetch("/api/db")
-        .then((r) => r.json())
-        .then((d) => {
-          if (d && Array.isArray(d.portadores) && d.portadores.length > 0) {
-            setPortadores(d.portadores);
-            LS.set("nc_portadores", d.portadores);
+        setUser(u);
+
+        // ==========================================================
+        // CARREGA PORTADORES DIRETAMENTE DO POSTGRESQL
+        // ==========================================================
+
+        const responsePortadores = await fetch("/api/portadores", {
+          cache: "no-store",
+        });
+
+        if (!responsePortadores.ok) {
+          throw new Error("Não foi possível carregar os portadores.");
+        }
+
+        const dataPortadores = await responsePortadores.json();
+
+        if (
+          dataPortadores.success &&
+          Array.isArray(dataPortadores.portadores)
+        ) {
+          const lista = dataPortadores.portadores;
+
+          setPortadores(lista);
+
+          if (lista.length > 0) {
+            setSelectedPortadorId(lista[0].id);
           }
-          if (d && Array.isArray(d.disponiveis)) {
-            setDisponiveis(d.disponiveis);
-            LS.set("nc_disponiveis", d.disponiveis);
+
+          // Mantemos uma cópia temporária no navegador.
+          // O banco continua sendo a fonte principal.
+          try {
+            localStorage.setItem(
+              "nc_portadores",
+              JSON.stringify(lista)
+            );
+          } catch { }
+        } else {
+          setPortadores([]);
+        }
+
+        // ==========================================================
+        // DADOS DO PORTADOR LOGADO
+        // ==========================================================
+
+        if (u.role === "portador") {
+          const lista =
+            dataPortadores?.portadores || [];
+
+          let myP = lista.find(
+            (p) =>
+              String(p.userId) === String(u.id) ||
+              p.nome === u.name
+          );
+
+          if (myP) {
+            setMinhaRotina(myP.rotinas || []);
+            setMinhasMetas(myP.metas || []);
+            setDistMax(myP.geofenceMax || 150);
+            setSimDist(myP.distanciaMetros || 0);
+            setMeuHumor(myP.humor || null);
           }
-        })
-        .catch(() => {});
-    } catch { router.replace("/auth"); }
-    setLoading(false);
+        }
+
+        // ==========================================================
+        // DISPONÍVEIS
+        // ==========================================================
+
+        try {
+          const responseDisponiveis = await fetch(
+            "/api/db",
+            {
+              cache: "no-store",
+            }
+          );
+
+          if (responseDisponiveis.ok) {
+            const dadosDisponiveis =
+              await responseDisponiveis.json();
+
+            if (Array.isArray(dadosDisponiveis.disponiveis)) {
+              setDisponiveis(dadosDisponiveis.disponiveis);
+            }
+          }
+        } catch (error) {
+          console.warn(
+            "Não foi possível carregar disponíveis:",
+            error
+          );
+
+          setDisponiveis([]);
+        }
+      } catch (error) {
+        console.error(
+          "Erro ao carregar dados:",
+          error
+        );
+
+        router.replace("/auth");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    carregarDados();
   }, [router]);
 
   const selectedPortador = portadores.find((p) => p.id === selectedPortadorId) || portadores[0] || null;
@@ -969,16 +1023,13 @@ export default function LandingPage() {
   /* ================================================================ */
   const savePortadores = async (newList) => {
     setPortadores(newList);
-    LS.set("nc_portadores", newList);
+
     try {
-      await fetch("/api/db", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ portadores: newList })
-      });
-    } catch (e) {
-      console.warn("Fallback offline na persistência:", e);
-    }
+      localStorage.setItem(
+        "nc_portadores",
+        JSON.stringify(newList)
+      );
+    } catch { }
   };
 
   const saveDisponiveis = async (newList) => {
@@ -1042,94 +1093,312 @@ export default function LandingPage() {
   /* ================================================================ */
   /* ACOMPANHANTE — ROTINAS                                          */
   /* ================================================================ */
-  const handleAddRotina = (e) => {
+
+  const handleAddRotina = async (e) => {
     e.preventDefault();
-    if (!novaTarefa.trim() || !selectedPortador) return;
-    const nova = { id: Date.now(), hora: novaHora, titulo: novaTarefa, concluida: false };
-    const updated = portadores.map((p) =>
-      p.id === selectedPortador.id ? { ...p, rotinas: [...(p.rotinas || []), nova] } : p
-    );
-    savePortadores(updated);
-    setNovaTarefa("");
-    addToast("📅", "Tarefa adicionada!", `"${novaTarefa}" foi adicionada à rotina de ${selectedPortador.nome}.`);
-  };
 
-  const handleRemoveRotina = (rotinaId) => {
-    const updated = portadores.map((p) =>
-      p.id === selectedPortador.id
-        ? { ...p, rotinas: (p.rotinas || []).filter((r) => r.id !== rotinaId) }
-        : p
-    );
-    savePortadores(updated);
-  };
+    if (!novaTarefa.trim() || !selectedPortador) {
+      return;
+    }
 
-  /* ================================================================ */
-  /* ACOMPANHANTE — METAS                                            */
-  /* ================================================================ */
-  const handleGoalChange = (metaId, delta) => {
-    const updated = portadores.map((p) =>
-      p.id === selectedPortador.id
-        ? {
+    try {
+      const response = await fetch("/api/rotinas", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          portadorId: selectedPortador.id,
+          hora: novaHora,
+          titulo: novaTarefa.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || "Erro ao adicionar rotina."
+        );
+      }
+
+      const novaRotina = data.rotina;
+
+      const updated = portadores.map((p) =>
+        String(p.id) === String(selectedPortador.id)
+          ? {
             ...p,
-            metas: (p.metas || []).map((m) =>
-              m.id === metaId ? { ...m, progresso: Math.max(0, Math.min(100, m.progresso + delta)) } : m
+            rotinas: [
+              ...(p.rotinas || []),
+              novaRotina,
+            ],
+          }
+          : p
+      );
+
+      setPortadores(updated);
+
+      try {
+        localStorage.setItem(
+          "nc_portadores",
+          JSON.stringify(updated)
+        );
+      } catch { }
+
+      setNovaTarefa("");
+
+      addToast(
+        "📅",
+        "Tarefa adicionada!",
+        `"${novaRotina.titulo}" foi adicionada à rotina de ${selectedPortador.nome}.`,
+        "#16a34a"
+      );
+    } catch (error) {
+      console.error(
+        "Erro ao adicionar rotina:",
+        error
+      );
+
+      addToast(
+        "❌",
+        "Erro ao adicionar tarefa",
+        error.message,
+        "#ef4444"
+      );
+    }
+  };
+
+  const handleRemoveRotina = async (rotinaId) => {
+    if (!rotinaId) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/rotinas", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: rotinaId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || "Erro ao excluir rotina."
+        );
+      }
+
+      const updated = portadores.map((p) =>
+        String(p.id) === String(selectedPortador?.id)
+          ? {
+            ...p,
+            rotinas: (p.rotinas || []).filter(
+              (r) =>
+                String(r.id) !== String(rotinaId)
             ),
           }
-        : p
-    );
-    savePortadores(updated);
+          : p
+      );
+
+      setPortadores(updated);
+
+      try {
+        localStorage.setItem(
+          "nc_portadores",
+          JSON.stringify(updated)
+        );
+      } catch { }
+
+      addToast(
+        "🗑️",
+        "Rotina removida!",
+        "A tarefa foi removida do PostgreSQL.",
+        "#e11d48"
+      );
+    } catch (error) {
+      console.error(
+        "Erro ao remover rotina:",
+        error
+      );
+
+      addToast(
+        "❌",
+        "Erro ao remover tarefa",
+        error.message,
+        "#ef4444"
+      );
+    }
   };
 
-  const handleAddMeta = () => {
-    const titulo = window.prompt("Nome da nova meta:");
-    if (!titulo?.trim() || !selectedPortador) return;
-    const updated = portadores.map((p) =>
-      p.id === selectedPortador.id
-        ? { ...p, metas: [...(p.metas || []), { id: Date.now(), titulo: titulo.trim(), progresso: 0 }] }
-        : p
-    );
-    savePortadores(updated);
-    addToast("🎯", "Meta criada!", `"${titulo}" adicionada para ${selectedPortador.nome}.`);
-  };
 
   /* ================================================================ */
   /* ACOMPANHANTE — EMERGÊNCIA                                       */
   /* ================================================================ */
+
   const handleEmergency = (nome, fone) => {
-    setEmergencyAuth({ nome, fone });
+    setEmergencyAuth({
+      nome,
+      fone,
+    });
+
     setEmergencyModal(true);
   };
+
   const handleConfirmEmergency = () => {
-    addToast("🚨", `Chamado enviado para ${emergencyAuth?.nome}!`,
-      `GPS: -23.5505, -46.6333 • Portador: ${selectedPortador?.nome || "—"}`, "#dc2626");
+    addToast(
+      "🚨",
+      `Chamado enviado para ${emergencyAuth?.nome || "contato"}!`,
+      `GPS: -23.5505, -46.6333 • Portador: ${selectedPortador?.nome || "—"}`,
+      "#dc2626"
+    );
+
     setEmergencyModal(false);
   };
+
 
   /* ================================================================ */
   /* PORTADOR — ROTINAS                                               */
   /* ================================================================ */
-  const handleToggleRotina = (id) => {
-    const updated = minhaRotina.map((r) =>
-      r.id === id ? { ...r, concluida: !r.concluida } : r
+
+  const handleToggleRotina = async (id) => {
+    if (!id || !user) {
+      return;
+    }
+
+    const meuPortador = portadores.find(
+      (p) =>
+        String(p.userId) === String(user.id) ||
+        p.nome === user.name
     );
-    setMinhaRotina(updated);
-    // Persiste no portador correspondente
-    const updatedP = portadores.map((p) =>
-      p.nome === user?.name ? { ...p, rotinas: updated } : p
+
+    if (!meuPortador) {
+      addToast(
+        "❌",
+        "Portador não encontrado",
+        "Não foi possível localizar o portador associado ao usuário.",
+        "#ef4444"
+      );
+
+      return;
+    }
+
+    const rotinaAtual = (
+      meuPortador.rotinas || []
+    ).find(
+      (r) => String(r.id) === String(id)
     );
-    savePortadores(updatedP);
-    const task = updated.find((r) => r.id === id);
-    if (task?.concluida) addToast("✅", "Tarefa concluída!", task.titulo, "#16a34a");
+
+    if (!rotinaAtual) {
+      addToast(
+        "❌",
+        "Rotina não encontrada",
+        "A tarefa selecionada não foi localizada.",
+        "#ef4444"
+      );
+
+      return;
+    }
+
+    const novaConcluida =
+      !rotinaAtual.concluida;
+
+    try {
+      const response = await fetch("/api/rotinas", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          concluida: novaConcluida,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || "Erro ao atualizar rotina."
+        );
+      }
+
+      const rotinaAtualizada = data.rotina;
+
+      setMinhaRotina((prev) =>
+        prev.map((r) =>
+          String(r.id) === String(id)
+            ? rotinaAtualizada
+            : r
+        )
+      );
+
+      const updatedPortadores =
+        portadores.map((p) =>
+          String(p.id) ===
+            String(meuPortador.id)
+            ? {
+              ...p,
+              rotinas: (p.rotinas || []).map(
+                (r) =>
+                  String(r.id) === String(id)
+                    ? rotinaAtualizada
+                    : r
+              ),
+            }
+            : p
+        );
+
+      setPortadores(updatedPortadores);
+
+      try {
+        localStorage.setItem(
+          "nc_portadores",
+          JSON.stringify(updatedPortadores)
+        );
+      } catch { }
+
+      if (rotinaAtualizada.concluida) {
+        addToast(
+          "✅",
+          "Tarefa concluída!",
+          rotinaAtualizada.titulo,
+          "#16a34a"
+        );
+      } else {
+        addToast(
+          "↩️",
+          "Tarefa reaberta!",
+          rotinaAtualizada.titulo,
+          "#0066c0"
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Erro ao atualizar rotina:",
+        error
+      );
+
+      addToast(
+        "❌",
+        "Erro ao atualizar tarefa",
+        error.message,
+        "#ef4444"
+      );
+    }
   };
 
   /* ================================================================ */
   /* PORTADOR — HUMOR                                                 */
   /* ================================================================ */
   const humores = [
-    { key: "bem",      emoji: "😄", label: "Muito Bem",       feedback: "Que ótimo! Aproveite o seu dia com tranquilidade. 🌟" },
-    { key: "calmo",    emoji: "😌", label: "Tranquilo",        feedback: "Estar calmo ajuda a se concentrar nas atividades. 💙" },
+    { key: "bem", emoji: "😄", label: "Muito Bem", feedback: "Que ótimo! Aproveite o seu dia com tranquilidade. 🌟" },
+    { key: "calmo", emoji: "😌", label: "Tranquilo", feedback: "Estar calmo ajuda a se concentrar nas atividades. 💙" },
     { key: "inquieto", emoji: "😟", label: "Inquieto / Ansioso", feedback: "Tudo bem se sentir assim. Respire fundo e tome uma água. 🌬️" },
-    { key: "cansado",  emoji: "😴", label: "Cansado",          feedback: "Seu corpo pede descanso. Que tal uma pausa sensorial agora? 🎧" },
+    { key: "cansado", emoji: "😴", label: "Cansado", feedback: "Seu corpo pede descanso. Que tal uma pausa sensorial agora? 🎧" },
   ];
 
   const handleHumor = (h) => {
@@ -1189,10 +1458,9 @@ export default function LandingPage() {
           </Link>
 
           <div className={styles.dashUserArea}>
-            <span className={`${styles.userRoleBadge} ${
-              user.role === "portador" ? styles.badgePortador :
+            <span className={`${styles.userRoleBadge} ${user.role === "portador" ? styles.badgePortador :
               user.role === "acompanhante" ? styles.badgeAcompanhante : styles.badgeAdmin
-            }`}>
+              }`}>
               {user.role === "portador" ? "💙" : user.role === "acompanhante" ? "📋" : "⚙️"} {user.name}
             </span>
             <button onClick={handleLogout} className={styles.logoutBtn}>Sair</button>
@@ -1215,10 +1483,10 @@ export default function LandingPage() {
             {/* ABAS DO PORTADOR */}
             <nav className={styles.portadorTabsNav}>
               {[
-                { key: "rotinas",      label: "🌟 Minha Rotina & Metas" },
+                { key: "rotinas", label: "🌟 Minha Rotina & Metas" },
                 { key: "acompanhante", label: "👥 Meu Acompanhante" },
-                { key: "localizacao",  label: "📍 Onde Estou" },
-                { key: "emergencia",   label: "🛑 Ajuda & Pausa" },
+                { key: "localizacao", label: "📍 Onde Estou" },
+                { key: "emergencia", label: "🛑 Ajuda & Pausa" },
               ].map((t) => (
                 <button key={t.key} type="button"
                   className={`${styles.portadorTabBtn} ${portadorTab === t.key ? styles.portadorTabActive : ""}`}
@@ -1304,7 +1572,7 @@ export default function LandingPage() {
             {/* ---- ABA 2: MEU ACOMPANHANTE ---- */}
             {portadorTab === "acompanhante" && (() => {
               const care = portadores.find((p) => p.nome !== user.name) ||
-                           { nome: "Acompanhante", distanciaMetros: 120, mensagens: [] };
+                { nome: "Acompanhante", distanciaMetros: 120, mensagens: [] };
               return (
                 <div style={{ maxWidth: 760, margin: "0 auto" }}>
                   <div className={styles.cardPortador}>
@@ -1336,10 +1604,10 @@ export default function LandingPage() {
                     <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#004c97", marginBottom: 10 }}>Envie um recado com 1 toque:</h3>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
                       {[
-                        { msg: "Estou bem e tranquilo! 💙",        bg: "#f0f7ff", color: "#0066c0", border: "#bfdbfe" },
-                        { msg: "Terminei minha atividade! ✅",       bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-                        { msg: "Estou em pausa sensorial 🎧",        bg: "#fef7e6", color: "#b45309", border: "#fde68a" },
-                        { msg: "Pode vir até aqui? 🚨",              bg: "#fff1f2", color: "#e11d48", border: "#fecdd3" },
+                        { msg: "Estou bem e tranquilo! 💙", bg: "#f0f7ff", color: "#0066c0", border: "#bfdbfe" },
+                        { msg: "Terminei minha atividade! ✅", bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+                        { msg: "Estou em pausa sensorial 🎧", bg: "#fef7e6", color: "#b45309", border: "#fde68a" },
+                        { msg: "Pode vir até aqui? 🚨", bg: "#fff1f2", color: "#e11d48", border: "#fecdd3" },
                       ].map(({ msg, bg, color, border }) => (
                         <button key={msg} type="button"
                           onClick={() => handleMensagemRapida(msg)}
@@ -1458,11 +1726,11 @@ export default function LandingPage() {
             {/* ABAS */}
             <nav className={styles.acompTabsNav}>
               {[
-                { key: "portadores",  label: `👥 Meus Portadores (${portadores.length})` },
-                { key: "rotinas",     label: "📅 Rotinas & Metas" },
+                { key: "portadores", label: `👥 Meus Portadores (${portadores.length})` },
+                { key: "rotinas", label: "📅 Rotinas & Metas" },
                 { key: "localizacao", label: "📍 Localização & Cerca Virtual" },
-                { key: "mensagens",   label: "💬 Mensagens" },
-                { key: "emergencia",  label: "🚨 Emergência" },
+                { key: "mensagens", label: "💬 Mensagens" },
+                { key: "emergencia", label: "🚨 Emergência" },
               ].map((t) => (
                 <button key={t.key} type="button"
                   className={`${styles.acompTabBtn} ${acompTab === t.key ? styles.acompTabActive : ""}`}
@@ -1742,8 +2010,8 @@ export default function LandingPage() {
                   </p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 }}>
                     {[
-                      { nome: "Polícia Militar",   fone: "190", emoji: "🚓", desc: "Busca & Resgate" },
-                      { nome: "SAMU",               fone: "192", emoji: "🚑", desc: "Urgência Médica" },
+                      { nome: "Polícia Militar", fone: "190", emoji: "🚓", desc: "Busca & Resgate" },
+                      { nome: "SAMU", fone: "192", emoji: "🚑", desc: "Urgência Médica" },
                       { nome: "Corpo de Bombeiros", fone: "193", emoji: "🚒", desc: "Primeiros Socorros" },
                     ].map((a) => (
                       <button key={a.fone} type="button"

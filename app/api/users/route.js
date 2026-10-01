@@ -1,47 +1,98 @@
 import { NextResponse } from "next/server";
-import { getDb, saveDb } from "@/app/lib/server-db";
+import pool from "@/app/lib/db";
 
 export async function GET() {
-  const db = getDb();
-  const safeUsers = db.users.map(({ password, ...u }) => u);
-  return NextResponse.json({ users: safeUsers });
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        name,
+        email,
+        phone,
+        birth_date,
+        role,
+        created_at
+      FROM users
+      ORDER BY id ASC
+      `
+    );
+
+    const users = result.rows.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      birthDate: user.birth_date,
+      role: user.role,
+      createdAt: user.created_at,
+    }));
+
+    return NextResponse.json({ users });
+  } catch (error) {
+    console.error("Erro ao buscar usuários:", error);
+
+    return NextResponse.json(
+      { error: "Erro ao buscar usuários." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(request) {
   try {
-    const { name, id } = await request.json();
-    const db = getDb();
+    const { id } = await request.json();
 
-    const targetUser = db.users.find(
-      (u) => (id && u.id === id) || (name && u.name.toLowerCase() === name.toLowerCase())
-    );
-
-    if (!targetUser) {
-      return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID do usuário é obrigatório." },
+        { status: 400 }
+      );
     }
 
-    if (targetUser.role === "administrador") {
+    const userResult = await pool.query(
+      `
+      SELECT id, name, role
+      FROM users
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    if (userResult.rows.length === 0) {
       return NextResponse.json(
-        { error: "O administrador principal não pode ser excluído." },
+        { error: "Usuário não encontrado." },
+        { status: 404 }
+      );
+    }
+
+    const user = userResult.rows[0];
+
+    if (user.role === "administrador") {
+      return NextResponse.json(
+        {
+          error:
+            "O administrador principal não pode ser excluído.",
+        },
         { status: 403 }
       );
     }
 
-    db.users = db.users.filter((u) => u.id !== targetUser.id);
-    db.portadores = db.portadores.filter((p) => p.nome.toLowerCase() !== targetUser.name.toLowerCase());
+    await pool.query(
+      "DELETE FROM users WHERE id = $1",
+      [id]
+    );
 
-    db.logs.unshift({
-      id: Date.now(),
-      time: new Date().toLocaleTimeString(),
-      type: "USER_DELETE",
-      user: "Admin",
-      action: `Usuário '${targetUser.name}' foi removido do banco de dados`,
-      level: "warning"
+    return NextResponse.json({
+      success: true,
+      removed: user.name,
     });
+  } catch (error) {
+    console.error("Erro ao excluir usuário:", error);
 
-    saveDb(db);
-    return NextResponse.json({ success: true, removed: targetUser.name });
-  } catch (err) {
-    return NextResponse.json({ error: "Erro ao excluir usuário: " + err.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erro ao excluir usuário." },
+      { status: 500 }
+    );
   }
 }
