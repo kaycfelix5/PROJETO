@@ -41,51 +41,70 @@ export async function GET() {
 
 export async function DELETE(request) {
   try {
-    const { id } = await request.json();
+    const { id, name } = await request.json();
 
-    if (!id) {
+    if (!id && !name) {
       return NextResponse.json(
-        { error: "ID do usuário é obrigatório." },
+        { error: "ID ou nome do usuário é obrigatório." },
         { status: 400 }
       );
     }
 
-    const userResult = await pool.query(
-      `
-      SELECT id, name, role
-      FROM users
-      WHERE id = $1
-      `,
-      [id]
-    );
+    let user = null;
 
-    if (userResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Usuário não encontrado." },
-        { status: 404 }
+    try {
+      const userResult = await pool.query(
+        `
+        SELECT id, name, role
+        FROM users
+        WHERE id::text = $1 OR ($2 <> '' AND LOWER(name) = LOWER($2))
+        LIMIT 1
+        `,
+        [id ? String(id) : "", name ? String(name).trim() : ""]
       );
+
+      if (userResult.rows.length > 0) {
+        user = userResult.rows[0];
+
+        if (user.role === "administrador") {
+          return NextResponse.json(
+            {
+              error:
+                "O administrador principal não pode ser excluído.",
+            },
+            { status: 403 }
+          );
+        }
+
+        await pool.query(
+          "DELETE FROM users WHERE id = $1",
+          [user.id]
+        );
+      }
+    } catch (pgErr) {
+      console.warn("Aviso ao excluir usuário no PostgreSQL:", pgErr.message);
     }
 
-    const user = userResult.rows[0];
-
-    if (user.role === "administrador") {
-      return NextResponse.json(
-        {
-          error:
-            "O administrador principal não pode ser excluído.",
-        },
-        { status: 403 }
-      );
+    // Also synchronize deletion with server-db (db.json)
+    try {
+      const { getDb, saveDb } = await import("@/app/lib/server-db");
+      const db = getDb();
+      if (Array.isArray(db.users)) {
+        db.users = db.users.filter(
+          (u) =>
+            u.role !== "administrador" &&
+            String(u.id) !== String(id) &&
+            (!name || u.name?.toLowerCase() !== name.toLowerCase())
+        );
+        saveDb(db);
+      }
+    } catch (dbErr) {
+      console.warn("Aviso ao remover de db.json:", dbErr.message);
     }
-
-    await pool.query(
-      "DELETE FROM users WHERE id = $1",
-      [id]
-    );
 
     return NextResponse.json({
       success: true,
-      removed: user.name,
+      removed: user ? user.name : name || String(id),
     });
   } catch (error) {
     console.error("Erro ao excluir usuário:", error);

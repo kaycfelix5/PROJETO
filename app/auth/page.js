@@ -41,9 +41,9 @@ function saveUsersDB(users) {
   localStorage.setItem("nc_users", JSON.stringify(users));
 }
 
-export default function AuthPage() {
+export default function AuthPage({ initialTab = "login" }) {
   const router = useRouter();
-  const [tab, setTab]           = useState("login");
+  const [tab, setTab]           = useState(initialTab);
   const [showPwd, setShowPwd]   = useState(false);
   const [loading, setLoading]   = useState(false);
   const [feedback, setFeedback] = useState(null); // { type: 'error'|'success', msg }
@@ -68,7 +68,9 @@ export default function AuthPage() {
     } catch {}
 
     const q = new URLSearchParams(window.location.search);
-    if (q.get("mode") === "cadastro") setTab("register");
+    if (q.get("mode") === "cadastro") {
+      setTimeout(() => setTab("register"), 0);
+    }
     if (localStorage.getItem("nc_auth") === "true") router.replace("/landing");
   }, [router]);
 

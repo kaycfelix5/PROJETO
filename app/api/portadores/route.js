@@ -1,33 +1,53 @@
 import { NextResponse } from "next/server";
 import pool from "@/app/lib/db";
 
+/* ================================================================ */
+/* GET — LISTAR PORTADORES                                          */
+/* ================================================================ */
+
 export async function GET() {
-    try {
-        const portadoresResult = await pool.query(`
+  try {
+    const portadoresResult = await pool.query(`
       SELECT
-        id,
-        user_id,
-        nome,
-        idade,
-        condicao,
-        humor,
-        humor_emoji,
-        local,
-        distancia_metros,
-        pin_x,
-        pin_y,
-        geofence_max,
-        bateria,
-        criado_em
-      FROM portadores
-      ORDER BY id ASC
+  p.id,
+  p.user_id AS "userId",
+  p.nome,
+  p.idade,
+  p.condicao,
+  p.humor,
+  p.humor_emoji AS "humorEmoji",
+  p.local,
+  p.distancia_metros AS "distanciaMetros",
+  p.pin_x AS "pinX",
+  p.pin_y AS "pinY",
+  p.geofence_max AS "geofenceMax",
+  p.bateria,
+
+  (
+    SELECT l.latitude
+    FROM localizacoes l
+    WHERE l.portador_id = p.id
+    ORDER BY l.registrada_em DESC
+    LIMIT 1
+  ) AS latitude,
+
+  (
+    SELECT l.longitude
+    FROM localizacoes l
+    WHERE l.portador_id = p.id
+    ORDER BY l.registrada_em DESC
+    LIMIT 1
+  ) AS longitude
+
+FROM portadores p
+ORDER BY p.id ASC
     `);
 
-        const portadores = [];
+    const portadores = [];
 
-        for (const portador of portadoresResult.rows) {
-            const rotinasResult = await pool.query(
-                `
+    for (const p of portadoresResult.rows) {
+      const rotinasResult = await pool.query(
+        `
         SELECT
           id,
           hora,
@@ -37,11 +57,11 @@ export async function GET() {
         WHERE portador_id = $1
         ORDER BY hora ASC, id ASC
         `,
-                [portador.id]
-            );
+        [p.id]
+      );
 
-            const metasResult = await pool.query(
-                `
+      const metasResult = await pool.query(
+        `
         SELECT
           id,
           titulo,
@@ -50,73 +70,222 @@ export async function GET() {
         WHERE portador_id = $1
         ORDER BY id ASC
         `,
-                [portador.id]
-            );
+        [p.id]
+      );
 
-            const mensagensResult = await pool.query(
-                `
+      const mensagensResult = await pool.query(
+        `
         SELECT
           id,
           texto,
           hora,
-          criado_em
+          criado_em AS "criadoEm"
         FROM mensagens
         WHERE portador_id = $1
-        ORDER BY criado_em ASC, id ASC
+        ORDER BY criado_em ASC
         `,
-                [portador.id]
-            );
+        [p.id]
+      );
 
-            portadores.push({
-                id: String(portador.id),
-                userId: String(portador.user_id),
-                nome: portador.nome,
-                idade: portador.idade,
-                condicao: portador.condicao,
-                humor: portador.humor,
-                humorEmoji: portador.humor_emoji,
-                local: portador.local,
-                distanciaMetros: Number(portador.distancia_metros) || 0,
-                pinX: Number(portador.pin_x) || 50,
-                pinY: Number(portador.pin_y) || 50,
-                geofenceMax: Number(portador.geofence_max) || 150,
-                bateria: Number(portador.bateria) || 100,
-
-                rotinas: rotinasResult.rows.map((rotina) => ({
-                    id: String(rotina.id),
-                    hora: rotina.hora,
-                    titulo: rotina.titulo,
-                    concluida: rotina.concluida,
-                })),
-
-                metas: metasResult.rows.map((meta) => ({
-                    id: String(meta.id),
-                    titulo: meta.titulo,
-                    progresso: Number(meta.progresso) || 0,
-                })),
-
-                mensagens: mensagensResult.rows.map((mensagem) => ({
-                    id: String(mensagem.id),
-                    texto: mensagem.texto,
-                    hora: mensagem.hora,
-                    criadoEm: mensagem.criado_em,
-                })),
-            });
-        }
-
-        return NextResponse.json({
-            success: true,
-            portadores,
-        });
-    } catch (error) {
-        console.error("Erro ao buscar portadores:", error);
-
-        return NextResponse.json(
-            {
-                success: false,
-                error: "Erro ao buscar portadores.",
-            },
-            { status: 500 }
-        );
+      portadores.push({
+        ...p,
+        rotinas: rotinasResult.rows,
+        metas: metasResult.rows,
+        mensagens: mensagensResult.rows,
+      });
     }
+
+    return NextResponse.json({
+      success: true,
+      portadores,
+    });
+  } catch (error) {
+    console.error("ERRO AO BUSCAR PORTADORES:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Não foi possível carregar os portadores.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/* ================================================================ */
+/* PUT — ATUALIZAR PORTADOR                                        */
+/* ================================================================ */
+
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+
+    const portadorId = body.portadorId;
+
+    if (!portadorId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "O portador é obrigatório.",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * Atualização de humor
+     */
+    if (
+      body.humor !== undefined ||
+      body.humorEmoji !== undefined
+    ) {
+      const humor = String(body.humor || "").trim();
+      const humorEmoji = String(
+        body.humorEmoji || ""
+      ).trim();
+
+      if (!humor || !humorEmoji) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Humor e emoji são obrigatórios.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const result = await pool.query(
+        `
+        UPDATE portadores
+        SET
+          humor = $1,
+          humor_emoji = $2
+        WHERE id = $3
+        RETURNING
+          id,
+          user_id AS "userId",
+          nome,
+          idade,
+          condicao,
+          humor,
+          humor_emoji AS "humorEmoji",
+          local,
+          distancia_metros AS "distanciaMetros",
+          pin_x AS "pinX",
+          pin_y AS "pinY",
+          geofence_max AS "geofenceMax",
+          bateria
+        `,
+        [
+          humor,
+          humorEmoji,
+          portadorId,
+        ]
+      );
+
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Portador não encontrado.",
+          },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        portador: result.rows[0],
+      });
+    }
+
+    /*
+     * Atualização da Cerca Virtual
+     */
+    if (body.geofenceMax !== undefined) {
+      const geofenceMax = Number(
+        body.geofenceMax
+      );
+
+      if (
+        !Number.isFinite(geofenceMax) ||
+        geofenceMax < 30 ||
+        geofenceMax > 500
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "A cerca deve estar entre 30 e 500 metros.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const result = await pool.query(
+        `
+        UPDATE portadores
+        SET geofence_max = $1
+        WHERE id = $2
+        RETURNING
+          id,
+          user_id AS "userId",
+          nome,
+          idade,
+          condicao,
+          humor,
+          humor_emoji AS "humorEmoji",
+          local,
+          distancia_metros AS "distanciaMetros",
+          pin_x AS "pinX",
+          pin_y AS "pinY",
+          geofence_max AS "geofenceMax",
+          bateria
+        `,
+        [
+          geofenceMax,
+          portadorId,
+        ]
+      );
+
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Portador não encontrado.",
+          },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        portador: result.rows[0],
+      });
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Nenhum campo válido foi enviado para atualização.",
+      },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error(
+      "ERRO AO ATUALIZAR PORTADOR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Não foi possível atualizar o portador.",
+      },
+      { status: 500 }
+    );
+  }
 }
